@@ -59,10 +59,8 @@ class AsterixDBBenchmarkQuerySuite(AbstractBenchmarkQuerySuite):
     def query_0_factory(self) -> AbstractBenchmarkQueryRunnable:
         class _Query0Runnable(AbstractBenchmarkQueryRunnable):
             def __init__(self, query_suite):
+                super(_Query0Runnable, self).__init__('0')
                 self.query_suite = query_suite
-
-            def __str__(self):
-                return '0'
 
             def invoke(self, date_1, date_2, timeout) -> dict:
                 return self.query_suite.execute_sqlpp(f"""
@@ -77,10 +75,8 @@ class AsterixDBBenchmarkQuerySuite(AbstractBenchmarkQuerySuite):
     def query_1_factory(self) -> AbstractBenchmarkQueryRunnable:
         class _Query1Runnable(AbstractBenchmarkQueryRunnable):
             def __init__(self, query_suite):
+                super(_Query1Runnable, self).__init__('1')
                 self.query_suite = query_suite
-
-            def __str__(self):
-                return '1'
 
             def invoke(self, date_1, date_2, timeout) -> dict:
                 return self.query_suite.execute_sqlpp(f"""
@@ -99,10 +95,8 @@ class AsterixDBBenchmarkQuerySuite(AbstractBenchmarkQuerySuite):
     def query_6_factory(self) -> AbstractBenchmarkQueryRunnable:
         class _Query6Runnable(AbstractBenchmarkQueryRunnable):
             def __init__(self, query_suite):
+                super(_Query6Runnable, self).__init__('6')
                 self.query_suite = query_suite
-
-            def __str__(self):
-                return '6'
 
             def invoke(self, date_1, date_2, timeout) -> dict:
                 return self.query_suite.execute_sqlpp(f"""
@@ -118,10 +112,8 @@ class AsterixDBBenchmarkQuerySuite(AbstractBenchmarkQuerySuite):
     def query_7_factory(self) -> AbstractBenchmarkQueryRunnable:
         class _Query7Runnable(AbstractBenchmarkQueryRunnable):
             def __init__(self, query_suite):
+                super(_Query7Runnable, self).__init__('7')
                 self.query_suite = query_suite
-
-            def __str__(self):
-                return '7'
 
             def invoke(self, date_1, date_2, timeout) -> dict:
                 return self.query_suite.execute_sqlpp(f"""
@@ -151,10 +143,8 @@ class AsterixDBBenchmarkQuerySuite(AbstractBenchmarkQuerySuite):
     def query_12_factory(self) -> AbstractBenchmarkQueryRunnable:
         class _Query12Runnable(AbstractBenchmarkQueryRunnable):
             def __init__(self, query_suite):
+                super(_Query12Runnable, self).__init__('12')
                 self.query_suite = query_suite
-
-            def __str__(self):
-                return '12'
 
             def invoke(self, date_1, date_2, timeout) -> dict:
                 return self.query_suite.execute_sqlpp(f"""
@@ -176,10 +166,8 @@ class AsterixDBBenchmarkQuerySuite(AbstractBenchmarkQuerySuite):
     def query_14_factory(self) -> AbstractBenchmarkQueryRunnable:
         class _Query14Runnable(AbstractBenchmarkQueryRunnable):
             def __init__(self, query_suite):
+                super(_Query14Runnable, self).__init__('14')
                 self.query_suite = query_suite
-
-            def __str__(self):
-                return '14'
 
             def invoke(self, date_1, date_2, timeout) -> dict:
                 return self.query_suite.execute_sqlpp(f"""
@@ -196,10 +184,8 @@ class AsterixDBBenchmarkQuerySuite(AbstractBenchmarkQuerySuite):
     def query_15_factory(self) -> AbstractBenchmarkQueryRunnable:
         class _Query15Runnable(AbstractBenchmarkQueryRunnable):
             def __init__(self, query_suite):
+                super(_Query15Runnable, self).__init__('15')
                 self.query_suite = query_suite
-
-            def __str__(self):
-                return '15'
 
             def invoke(self, date_1, date_2, timeout) -> dict:
                 return self.query_suite.execute_sqlpp(f"""
@@ -228,10 +214,8 @@ class AsterixDBBenchmarkQuerySuite(AbstractBenchmarkQuerySuite):
     def query_20_factory(self) -> AbstractBenchmarkQueryRunnable:
         class _Query20Runnable(AbstractBenchmarkQueryRunnable):
             def __init__(self, query_suite):
+                super(_Query20Runnable, self).__init__('20')
                 self.query_suite = query_suite
-
-            def __str__(self):
-                return '20'
 
             def invoke(self, date_1, date_2, timeout) -> dict:
                 return self.query_suite.execute_sqlpp(f"""
@@ -300,7 +284,6 @@ class AsterixDBBenchmarkRunnable(AbstractBenchmarkRunnable):
                     logger=self.logger,
                     **self.config['tpcCH']
                 ):
-
                     # Execute the query. Record the client response time.
                     self.logger.info(f'Executing query {query} with sigma {sigma} @ run {i + 1}.')
                     t_before = timeit.default_timer()

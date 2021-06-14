@@ -1,5 +1,4 @@
 import datetime
-import random
 import abc
 import faker
 
@@ -7,6 +6,12 @@ from dateutil import relativedelta
 
 
 class AbstractBenchmarkQueryRunnable(abc.ABC):
+    def __init__(self, query_name):
+        self.query_name = query_name
+
+    def __str__(self):
+        return self.query_name
+
     @abc.abstractmethod
     def invoke(self, date_1, date_2, timeout) -> dict:
         pass
@@ -15,6 +20,7 @@ class AbstractBenchmarkQueryRunnable(abc.ABC):
 class AbstractBenchmarkQuerySuite(abc.ABC):
     class NoOpBenchmarkQueryRunnable(AbstractBenchmarkQueryRunnable):
         """ To be used when a child class cannot implement the TPC-CH query. """
+
         def invoke(self, date_1, date_2, timeout) -> dict:
             return {'status': 'success', 'detail': 'Not implemented.'}
 
@@ -41,8 +47,10 @@ class AbstractBenchmarkQuerySuite(abc.ABC):
         self.config = kwargs
         self.faker = faker.Faker()
         self.factory_pointer = 0
-        self.factory_list = [self.query_1_factory, self.query_6_factory, self.query_7_factory, self.query_12_factory,
-                             self.query_14_factory, self.query_15_factory, self.query_20_factory]
+        self.factory_list = [
+            self.query_0_factory, self.query_1_factory, self.query_6_factory, self.query_7_factory,
+            self.query_12_factory, self.query_14_factory, self.query_15_factory, self.query_20_factory
+        ]
         self.logger = kwargs['logger']
 
     def __iter__(self):
