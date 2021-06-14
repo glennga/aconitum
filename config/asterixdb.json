@@ -1,0 +1,12 @@
+{
+  "benchmark": {
+    "clusterController": {
+      "address": "localhost",
+      "port": 19002
+    },
+    "allNodesInCluster": [
+      "localhost"
+    ]
+  },
+  "package": "resources/asterixdb"
+}
