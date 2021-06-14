@@ -1,0 +1,5 @@
+couchbase
+requests
+pymongo
+python-dateutil
+faker

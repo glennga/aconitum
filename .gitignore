@@ -1,0 +1,8 @@
+/venv/*
+/.idea/*
+/resources/*
+/out/*
+!/out/README.md
+
+# Don't leak our private keys... :-)
+*.pem
