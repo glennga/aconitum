@@ -47,7 +47,7 @@ log.dir=logs/
 log.level=INFO
 ```
 
-2. Create the dataverse (`TPC_CH`) required for this experiment. We build two secondary indexes: one on the orderline delivery date and another on the stock item ID. 
+2. Create the dataverse required for this experiment. We build two secondary indexes: one on the orderline delivery date and another on the stock item ID. 
 ```sql
 DROP    DATAVERSE TPC_CH IF EXISTS;
 CREATE  DATAVERSE TPC_CH;
@@ -82,35 +82,35 @@ CREATE  TYPE SupplierType AS { su_suppkey: bigint };
 CREATE  DATASET Supplier (SupplierType) PRIMARY KEY su_suppkey; 
 ```
 
-3. Load each dataset in the dataverse (`TPC_CH`). Adjust the path accordingly.
+3. Load each dataset in the dataverse. Adjust the path accordingly.
 
 ```sql
 LOAD DATASET TPC_CH.Customer USING localfs (
-  ("path"="localhost:///home/ubuntu/aconitum/resources/sample/customer.json"), 
+  ("path"="localhost:///home/ubuntu/aconitum/resources/tpc_ch/customer.json"), 
   ("format"="json") 
 );
 LOAD DATASET TPC_CH.Nation USING localfs ( 
-  ("path"="localhost:///home/ubuntu/aconitum/resources/sample/nation.json"),
+  ("path"="localhost:///home/ubuntu/aconitum/resources/tpc_ch/nation.json"),
   ("format"="json") 
 );
 LOAD DATASET TPC_CH.Orders USING localfs ( 
-  ("path"="localhost:///home/ubuntu/aconitum/resources/sample/orders.json"), 
+  ("path"="localhost:///home/ubuntu/aconitum/resources/tpc_ch/orders.json"), 
   ("format"="json") 
 );
 LOAD DATASET TPC_CH.Stock USING localfs ( 
-  ("path"="localhost:///home/ubuntu/aconitum/resources/sample/stock.json"), 
+  ("path"="localhost:///home/ubuntu/aconitum/resources/tpc_ch/stock.json"), 
   ("format"="json") 
 );    
 LOAD DATASET TPC_CH.Item USING localfs ( 
-  ("path"="localhost:///home/ubuntu/aconitum/resources/sample/item.json"), 
+  ("path"="localhost:///home/ubuntu/aconitum/resources/tpc_ch/item.json"), 
   ("format"="json") 
 );            
 LOAD DATASET TPC_CH.Region USING localfs ( 
-  ("path"="localhost:///home/ubuntu/aconitum/resources/sample/region.json"), 
+  ("path"="localhost:///home/ubuntu/aconitum/resources/tpc_ch/region.json"), 
   ("format"="json") 
 );                  
 LOAD DATASET TPC_CH.Supplier USING localfs ( 
-  ("path"="localhost:///home/ubuntu/aconitum/resources/sample/supplier.json"), 
+  ("path"="localhost:///home/ubuntu/aconitum/resources/tpc_ch/supplier.json"), 
   ("format"="json") 
 ); 
 ```
@@ -125,8 +125,8 @@ python3 aconitum/_asterixdb.py
 
 ### Couchbase
 
-1. Ensure that Couchbase 7.0 is installed and configured on the node to run the experiments on. Docs on the install can be found [here](https://docs.couchbase.com/server/7.0/install/ubuntu-debian-install.html). Use the deb package instructions to get the latest and greatest. The memory for the Data service should be maximized (~6050 MB), and the only other service that should be available is the Index service (512 MB).
-2. Create the bucket to hold all of your data. This should utilize the entire cluster's memory data quota (6050MB in this case). Change the bucket's ejection method policy from _Value-only_ to _Full_.
+1. Ensure that Couchbase 7.0 is installed and configured on the node to run the experiments on. Docs on the install can be found [here](https://docs.couchbase.com/server/7.0/install/ubuntu-debian-install.html). Use the deb package instructions to get the latest and greatest. The memory for the Data service was allocated to be half of the system memory (4096 MB), and the only other service that was made available was the Index service (512 MB).
+2. Create the bucket to hold all of your data. This should utilize the entire cluster's memory data quota (4096 MB in this case). Change the bucket's ejection method policy from _Value-only_ to _Full_.
 3. Create the collections and indexes associated with each collection. The default scope of the bucket is used to house each collection.
 
 ```sql
@@ -175,7 +175,7 @@ for c in customer nation orders stock item region supplier; do
   /opt/couchbase/bin/cbimport json \
     --cluster localhost --username "admin" --password "password" \
     --bucket "aconitum" --scope-collection-exp _default.${c^} \
-    --dataset file:///home/ubuntu/aconitum/resources/sample/$c.json \
+    --dataset file:///home/ubuntu/aconitum/resources/tpc_ch/$c.json \
     --format lines --generate-key key::#UUID#
 done
 ```
@@ -191,3 +191,57 @@ python3 aconitum/_couchbase.py
 
 ### MongoDB
 
+1. Ensure that MongoDB is installed and configured on the node to run the experiments on. Docs on the install can be found [here](https://docs.mongodb.com/manual/tutorial/install-mongodb-on-ubuntu/). Enable access control for a user.
+
+```javascript
+use admin
+
+db.createUser ({
+  user: "admin",
+  pwd: "password",
+  roles: [ { role: "userAdminAnyDatabase", db: "admin" }, "readWriteAnyDatabase" ]
+})
+```
+
+2. Create the database, collections, and index required for this experiment.
+
+```javascript
+use aconitum
+
+db.createCollection ( "Customer" )
+db.createCollection ( "Nation" )
+db.createCollection ( "Orders" )
+db.createCollection ( "Stock" )
+db.createCollection ( "Item" )
+db.createCollection ( "Region" )
+db.createCollection ( "Supplier" )
+
+db.Orders.createIndex( 
+	{ "o_orderline.ol_delivery_d": 1 }, 
+	{ name: "orderlineDelivDateIdx" } 
+)
+```
+
+3. Load each collection in the database. Adjust the path accordingly.
+
+```bash
+for c in customer nation orders stock item region supplier; do
+  mongoimport \
+    --authenticationDatabase admin \
+    --db aconitum \
+    --collection ${c^} \
+    --host localhost:27017 \
+    --username admin \
+    --password password \
+    --drop \
+    /home/ubuntu/aconitum/resources/tpc_ch/$c.json
+done
+```
+
+4. Execute the benchmark query suite for MongoDB.
+
+```bash
+python3 aconitum/_mongodb.py
+```
+
+5. Analyze the results! The results will be stored in the `out` folder under `results.json` as single line JSON documents.
