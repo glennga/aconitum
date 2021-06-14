@@ -203,7 +203,7 @@ db.createUser ({
 })
 ```
 
-2. Create the database, collections, and index required for this experiment.
+2. Create the database and collections required for this experiment.
 
 ```javascript
 use aconitum
@@ -215,11 +215,6 @@ db.createCollection ( "Stock" )
 db.createCollection ( "Item" )
 db.createCollection ( "Region" )
 db.createCollection ( "Supplier" )
-
-db.Orders.createIndex( 
-	{ "o_orderline.ol_delivery_d": 1 }, 
-	{ name: "orderlineDelivDateIdx" } 
-)
 ```
 
 3. Load each collection in the database. Adjust the path accordingly.
@@ -238,10 +233,21 @@ for c in customer nation orders stock item region supplier; do
 done
 ```
 
-4. Execute the benchmark query suite for MongoDB.
+4. Create the multi-valued index for this experiment.
+
+```javascript
+use aconitum
+
+db.Orders.createIndex( 
+	{ "o_orderline.ol_delivery_d": 1 }, 
+	{ name: "orderlineDelivDateIdx" } 
+)
+```
+
+5. Execute the benchmark query suite for MongoDB.
 
 ```bash
 python3 aconitum/_mongodb.py
 ```
 
-5. Analyze the results! The results will be stored in the `out` folder under `results.json` as single line JSON documents.
+6. Analyze the results! The results will be stored in the `out` folder under `results.json` as single line JSON documents.
