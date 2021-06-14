@@ -1,0 +1,10 @@
+{
+  "username": "admin",
+  "password": "password",
+  "cluster": {
+    "ramsize": 3899,
+    "indexRamsize": 512,
+    "address": "localhost",
+    "bucket": "aconitum"
+  }
+}
