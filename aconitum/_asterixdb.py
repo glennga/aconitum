@@ -275,6 +275,7 @@ class AsterixDBBenchmarkRunnable(AbstractBenchmarkRunnable):
         self.nc_uri = self.config['benchmark']['clusterController']['address'] + ':' + \
                       str(self.config['benchmark']['clusterController']['port'])
         self.nc_uri = 'http://' + self.nc_uri + '/query/service'
+        self.exclude_set = set()
 
     def perform_benchmark(self):
         for i in range(self.config['experiment']['repeat']):
@@ -284,6 +285,10 @@ class AsterixDBBenchmarkRunnable(AbstractBenchmarkRunnable):
                     logger=self.logger,
                     **self.config['tpcCH']
                 ):
+                    # Check if these current parameters exist in the exclude set.
+                    if (sigma, str(query),) in self.exclude_set:
+                        continue
+
                     # Execute the query. Record the client response time.
                     self.logger.info(f'Executing query {query} with sigma {sigma} @ run {i + 1}.')
                     t_before = timeit.default_timer()
@@ -291,6 +296,11 @@ class AsterixDBBenchmarkRunnable(AbstractBenchmarkRunnable):
                     results['clientTime'] = timeit.default_timer() - t_before
                     results['runNumber'] = i
                     self.log_results(results)
+
+                    # If this query has timed out, add the query + parameter to the exclude set.
+                    if results['status'] == 'timeout':
+                        self.logger.warning('Query has timed out. No longer running working sigma + query.')
+                        self.exclude_set.add((sigma, str(query),))
 
 
 if __name__ == '__main__':
