@@ -1,0 +1,9 @@
+{
+  "username": "admin",
+  "password": "password",
+  "database": {
+    "name": "aconitum",
+    "address": "localhost",
+    "port": 27017
+  }
+}
