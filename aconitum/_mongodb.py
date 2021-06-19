@@ -7,7 +7,7 @@ import urllib.parse
 import bson.json_util
 import pymongo.errors
 
-from aconitum.query import AbstractBenchmarkQueryRunnable, AbstractBenchmarkQuerySuite
+from aconitum.query import AbstractBenchmarkQueryRunnable, AbstractBenchmarkQuerySuite, NoOpBenchmarkQueryRunnable
 from aconitum.executor import AbstractBenchmarkRunnable
 
 
@@ -62,36 +62,130 @@ class MongoDBBenchmarkQuerySuite(AbstractBenchmarkQuerySuite):
 
         return {'queryResults': query_results, 'clientTime': client_time, 'status': status, 'query': query}
 
-    def query_0_factory(self) -> AbstractBenchmarkQueryRunnable:
-        class _Query0Runnable(AbstractBenchmarkQueryRunnable):
+    def query_a_factory(self) -> AbstractBenchmarkQueryRunnable:
+        class _QueryARunnable(AbstractBenchmarkQueryRunnable):
             def __init__(self, query_suite):
-                super(_Query0Runnable, self).__init__('0')
-                self.query_suite = query_suite
-            
-            def invoke(self, date_1, date_2, timeout) -> dict:
-                return self.query_suite.execute_select(**{
-                    'name': 'Orders',
-                    'count': {'o_orderline': {'$elemMatch': {'ol_delivery_d': {'$gte': date_1, '$lte': date_2}}}},
-                    'aggregate': None,
-                    'timeout': timeout * 1000
-                })
-                
-        return _Query0Runnable(query_suite=self)
-    
-    def query_1_factory(self) -> AbstractBenchmarkQueryRunnable:
-        class _Query1Runnable(AbstractBenchmarkQueryRunnable):
-            def __init__(self, query_suite):
-                super(_Query1Runnable, self).__init__('1')
+                super(_QueryARunnable, self).__init__('A', query_suite.generate_dates)
                 self.query_suite = query_suite
 
-            def invoke(self, date_1, date_2, timeout) -> dict:
+            def invoke(self, v0, v1, timeout) -> dict:
                 return self.query_suite.execute_select(**{
                     'name': 'Orders',
                     'count': None,
                     'aggregate': [
                         {
                             '$match': {'o_orderline': {
-                                '$elemMatch': {'ol_delivery_d': {'$gte': date_1, '$lte': date_2}}}
+                                '$elemMatch': {'ol_delivery_d': {'$gte': v0, '$lte': v1}}}
+                            }
+                        },
+                        {
+                            '$unwind': {'path': '$o_orderline'}
+                        },
+                        {
+                            '$match': {'o_orderline.ol_delivery_d': {'$gte': v0, '$lte': v1}}
+                        },
+                        {
+                            '$count': 'count_orders'
+                        }
+                    ],
+                    'timeout': timeout * 1000
+                })
+
+        return _QueryARunnable(query_suite=self)
+
+    def query_b_factory(self) -> AbstractBenchmarkQueryRunnable:
+        class _QueryBRunnable(AbstractBenchmarkQueryRunnable):
+            def __init__(self, query_suite):
+                super(_QueryBRunnable, self).__init__('A', query_suite.generate_dates)
+                self.query_suite = query_suite
+
+            def invoke(self, v0, v1, timeout) -> dict:
+                return self.query_suite.execute_select(**{
+                    'name': 'Orders',
+                    'count': {'o_orderline': {'$elemMatch': {'ol_delivery_d': {'$gte': v0, '$lte': v1}}}},
+                    'aggregate': None,
+                    'timeout': timeout * 1000
+                })
+
+        return _QueryBRunnable(query_suite=self)
+
+    def query_c_factory(self) -> AbstractBenchmarkQueryRunnable:
+        class _QueryCRunnable(AbstractBenchmarkQueryRunnable):
+            def __init__(self, query_suite):
+                super(_QueryCRunnable, self).__init__('C', query_suite.generate_dates)
+                self.query_suite = query_suite
+
+            def invoke(self, v0, v1, timeout) -> dict:
+                return self.query_suite.execute_select(**{
+                    'name': 'Orders',
+                    'count': None,
+                    'aggregate': [
+                        {
+                            '$match': {'o_orderline': {
+                                '$all': [
+                                    {'$elemMatch': {'ol_delivery_d': {'$gte': v0, '$lte': v1}}}
+                                ],
+                                '$exists': True
+                            }}
+                        },
+                        {
+                            '$count': 'count_orders'
+                        }
+                    ],
+                    'timeout': timeout * 1000
+                })
+
+        return _QueryCRunnable(query_suite=self)
+
+    def query_d_factory(self) -> AbstractBenchmarkQueryRunnable:
+        class _QueryDRunnable(AbstractBenchmarkQueryRunnable):
+            def __init__(self, query_suite):
+                super(_QueryDRunnable, self).__init__('D', query_suite.generate_items)
+                self.query_suite = query_suite
+
+            def invoke(self, v0, v1, timeout) -> dict:
+                return self.query_suite.execute_select(**{
+                    'name': 'Item',
+                    'count': None,
+                    'aggregate': [
+                        {
+                            '$match': {'i_id': {'$gte': v0, '$lte': v1}}
+                        },
+                        {
+                            '$lookup': {'from': 'Orders',
+                                        'localField': 'i_id',
+                                        'foreignField': 'o_orderline.ol_i_id',
+                                        'as': 'orders'}
+                        },
+                        {
+                            '$unwind': {'path': '$orders'}
+                        },
+                        {
+                            '$unwind': {'path': '$orders.o_orderline'}
+                        },
+                        {
+                            '$count': 'count_order_item'
+                        }
+                    ],
+                    'timeout': timeout * 1000
+                })
+
+        return _QueryDRunnable(query_suite=self)
+
+    def query_1_factory(self) -> AbstractBenchmarkQueryRunnable:
+        class _Query1Runnable(AbstractBenchmarkQueryRunnable):
+            def __init__(self, query_suite):
+                super(_Query1Runnable, self).__init__('1', query_suite.generate_dates)
+                self.query_suite = query_suite
+
+            def invoke(self, v0, v1, timeout) -> dict:
+                return self.query_suite.execute_select(**{
+                    'name': 'Orders',
+                    'count': None,
+                    'aggregate': [
+                        {
+                            '$match': {'o_orderline': {
+                                '$elemMatch': {'ol_delivery_d': {'$gte': v0, '$lte': v1}}}
                             }
                         },
                         {
@@ -117,17 +211,17 @@ class MongoDBBenchmarkQuerySuite(AbstractBenchmarkQuerySuite):
     def query_6_factory(self) -> AbstractBenchmarkQueryRunnable:
         class _Query6Runnable(AbstractBenchmarkQueryRunnable):
             def __init__(self, query_suite):
-                super(_Query6Runnable, self).__init__('6')
+                super(_Query6Runnable, self).__init__('6', query_suite.generate_dates)
                 self.query_suite = query_suite
 
-            def invoke(self, date_1, date_2, timeout) -> dict:
+            def invoke(self, v0, v1, timeout) -> dict:
                 return self.query_suite.execute_select(**{
                     'name': 'Orders',
                     'count': None,
                     'aggregate': [
                         {
                             '$match': {'o_orderline': {
-                                '$elemMatch': {'ol_delivery_d': {'$gte': date_1, '$lte': date_2}}}
+                                '$elemMatch': {'ol_delivery_d': {'$gte': v0, '$lte': v1}}}
                             }
                         },
                         {
@@ -144,22 +238,23 @@ class MongoDBBenchmarkQuerySuite(AbstractBenchmarkQuerySuite):
         return _Query6Runnable(query_suite=self)
 
     def query_7_factory(self) -> AbstractBenchmarkQueryRunnable:
-        return self.NoOpBenchmarkQueryRunnable('7')
+        self.logger.info('Query 7 is not implemented. Generating no-op runnable.')
+        return NoOpBenchmarkQueryRunnable('7')
 
     def query_12_factory(self) -> AbstractBenchmarkQueryRunnable:
         class _Query12Runnable(AbstractBenchmarkQueryRunnable):
             def __init__(self, query_suite):
-                super(_Query12Runnable, self).__init__('12')
+                super(_Query12Runnable, self).__init__('12', query_suite.generate_dates)
                 self.query_suite = query_suite
 
-            def invoke(self, date_1, date_2, timeout) -> dict:
+            def invoke(self, v0, v1, timeout) -> dict:
                 return self.query_suite.execute_select(**{
                     'name': 'Orders',
                     'count': None,
                     'aggregate': [
                         {
                             '$match': {'o_orderline': {
-                                '$elemMatch': {'ol_delivery_d': {'$gte': date_1, '$lte': date_2}}}
+                                '$elemMatch': {'ol_delivery_d': {'$gte': v0, '$lte': v1}}}
                             }
                         },
                         {
@@ -195,17 +290,17 @@ class MongoDBBenchmarkQuerySuite(AbstractBenchmarkQuerySuite):
     def query_14_factory(self) -> AbstractBenchmarkQueryRunnable:
         class _Query14Runnable(AbstractBenchmarkQueryRunnable):
             def __init__(self, query_suite):
-                super(_Query14Runnable, self).__init__('14')
+                super(_Query14Runnable, self).__init__('14', query_suite.generate_dates)
                 self.query_suite = query_suite
 
-            def invoke(self, date_1, date_2, timeout) -> dict:
+            def invoke(self, v0, v1, timeout) -> dict:
                 return self.query_suite.execute_select(**{
                     'name': 'Orders',
                     'count': None,
                     'aggregate': [
                         {
                             '$match': {'o_orderline': {
-                                '$elemMatch': {'ol_delivery_d': {'$gte': date_1, '$lte': date_2}}}
+                                '$elemMatch': {'ol_delivery_d': {'$gte': v0, '$lte': v1}}}
                             }
                         },
                         {
@@ -232,11 +327,9 @@ class MongoDBBenchmarkQuerySuite(AbstractBenchmarkQuerySuite):
                             }
                         },
                         {
-                            '$group': {
-                                '_id': None,
-                                'ol_amount_sum_pr': {'$sum': '$ol_amount_pr'},
-                                'ol_amount_sum': {'$sum': '$o_orderline.ol_amount'}
-                            }
+                            '$group': {'_id': None,
+                                       'ol_amount_sum_pr': {'$sum': '$ol_amount_pr'},
+                                       'ol_amount_sum': {'$sum': '$o_orderline.ol_amount'}}
                         },
                         {
                             '$project': {
@@ -255,10 +348,91 @@ class MongoDBBenchmarkQuerySuite(AbstractBenchmarkQuerySuite):
         return _Query14Runnable(query_suite=self)
 
     def query_15_factory(self) -> AbstractBenchmarkQueryRunnable:
-        return self.NoOpBenchmarkQueryRunnable('15')
+        class _Query15Runnable(AbstractBenchmarkQueryRunnable):
+            def __init__(self, query_suite):
+                super(_Query15Runnable, self).__init__('15', query_suite.generate_dates)
+                self.query_suite = query_suite
+
+            def invoke(self, v0, v1, timeout) -> dict:
+                return self.query_suite.execute_select(**{
+                    'name': 'Orders',
+                    'count': None,
+                    'aggregate': [
+                        {
+                            '$match': {'o_orderline': {
+                                '$elemMatch': {'ol_delivery_d': {'$gte': v0, '$lte': v1}}}
+                            }
+                        },
+                        {
+                            '$unwind': {'path': '$o_orderline'}
+                        },
+                        {
+                            '$lookup': {'from': 'Stock',
+                                        'localField': 'o_orderline.ol_i_id',
+                                        'foreignField': 's_i_id',
+                                        'as': 'stock'}
+                        },
+                        {
+                            '$unwind': {'path': '$stock'}
+                        },
+                        {
+                            '$match': {'$expr': {
+                                '$eq': ['$o_orderline.ol_supply_w_id', '$stock.s_w_id']
+                            }}
+                        },
+                        {
+                            '$project': {
+                                'supplier_no': {'$mod': [{'$multiply': ['$stock.s_w_id', '$stock.s_i_id']}, 10000]},
+                                'ol_amount': '$o_orderline.ol_amount'
+                            }
+                        },
+                        {
+                            '$group': {'_id': '$supplier_no',
+                                       'total_revenue': {'$sum': '$ol_amount'}}
+                        },
+                        {
+                            '$lookup': {'from': 'Supplier',
+                                        'localField': '_id',
+                                        'foreignField': 'su_suppkey',
+                                        'as': 'supplier'}
+                        },
+                        {
+                            '$unwind': {'path': '$supplier'}
+                        },
+                        {
+                            '$group': {'_id': None,
+                                       'data': {'$push': '$$ROOT'},
+                                       'max_revenue': {'$max': '$total_revenue'}}
+                        },
+                        {
+                            '$unwind': '$data'
+                        },
+                        {
+                            '$match': {'$expr': {
+                                '$eq': ['$data.total_revenue', '$max_revenue']
+                            }}
+                        },
+                        {
+                            '$project': {
+                                'su_suppkey': '$data.supplier.su_suppkey',
+                                'su_name': '$data.supplier.su_name',
+                                'su_address': '$data.supplier.su_address',
+                                'su_phone': '$data.supplier.su_phone',
+                                'total_revenue': '$data.total_revenue'
+                            }
+                        },
+                        {
+                            '$sort': {'su_suppkey': 1}
+                        }
+                    ],
+                    'timeout': timeout * 1000
+                })
+
+        return _Query15Runnable(query_suite=self)
 
     def query_20_factory(self) -> AbstractBenchmarkQueryRunnable:
-        return self.NoOpBenchmarkQueryRunnable('20')
+        self.logger.info('Query 20 is not implemented. Generating no-op runnable.')
+        return NoOpBenchmarkQueryRunnable('20')
 
 
 class MongoDBBenchmarkRunnable(AbstractBenchmarkRunnable):
@@ -302,12 +476,12 @@ class MongoDBBenchmarkRunnable(AbstractBenchmarkRunnable):
         for i in range(self.config['experiment']['repeat']):
             for sigma in self.config['experiment']['sigmaValues']:
                 for query in MongoDBBenchmarkQuerySuite(
-                        database=self.database,
-                        logger=self.logger,
-                        **self.config['tpcCH']
+                    database=self.database,
+                    logger=self.logger,
+                    **self.config['tpcCH']
                 ):
                     # Check if these current parameters exist in the exclude set.
-                    if (sigma, str(query), ) in self.exclude_set:
+                    if (sigma, str(query),) in self.exclude_set:
                         continue
 
                     # Execute the query. Record the client response time.
@@ -321,7 +495,7 @@ class MongoDBBenchmarkRunnable(AbstractBenchmarkRunnable):
                     # If this query has timed out, add the query + parameter to the exclude set.
                     if results['status'] == 'timeout':
                         self.logger.warning('Query has timed out. No longer running working sigma + query.')
-                        self.exclude_set.add((sigma, str(query), ))
+                        self.exclude_set.add((sigma, str(query),))
 
 
 if __name__ == '__main__':

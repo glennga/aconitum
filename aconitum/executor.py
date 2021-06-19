@@ -59,6 +59,7 @@ class AbstractBenchmarkRunnable(abc.ABC):
         results['logTime'] = str(datetime.datetime.now())
         results['executionID'] = self.execution_id
         results['workingSystem'] = self.working_system
+        results['runtimeNotes'] = self.config['runtimeNotes']
 
         # To the results file.
         self.logger.debug('Recording result to disk.')

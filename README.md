@@ -47,39 +47,38 @@ log.dir=logs/
 log.level=INFO
 ```
 
-2. Create the dataverse required for this experiment. We build two secondary indexes: one on the orderline delivery date and another on the stock item ID. 
+2. Create the dataverse required for this experiment. We build one secondary index on the orderline delivery dates.
 ```sql
 DROP    DATAVERSE TPC_CH IF EXISTS;
 CREATE  DATAVERSE TPC_CH;
 USE     TPC_CH;
 
 CREATE  TYPE CustomerType AS { c_w_id: bigint, c_d_id: bigint, c_id: bigint };
-CREATE  DATASET Customer (CustomerType) PRIMARY KEY c_w_id, c_d_id, c_id;
-
 CREATE  TYPE NationType AS { n_nationkey: bigint };
-CREATE  DATASET Nation (NationType) PRIMARY KEY n_nationkey;
-
 CREATE  TYPE OrdersType AS { o_w_id: bigint, o_d_id: bigint, o_id: bigint  };
+CREATE  TYPE StockType AS { s_w_id: bigint, s_i_id: bigint };
+CREATE  TYPE ItemType AS { i_id: bigint };
+CREATE  TYPE RegionType AS { r_regionkey: bigint };
+CREATE  TYPE SupplierType AS { su_suppkey: bigint };
+
+CREATE  DATASET Customer (CustomerType) PRIMARY KEY c_w_id, c_d_id, c_id;
+CREATE  DATASET Nation (NationType) PRIMARY KEY n_nationkey;
 CREATE  DATASET Orders (OrdersType) PRIMARY KEY o_w_id, o_d_id, o_id;
+CREATE  DATASET Stock (StockType) PRIMARY KEY s_w_id, s_i_id;
+CREATE  DATASET Item (ItemType) PRIMARY KEY i_id;
+CREATE  DATASET Region (RegionType) PRIMARY KEY r_regionkey;
+CREATE  DATASET Supplier (SupplierType) PRIMARY KEY su_suppkey; 
+
 CREATE  INDEX orderlineDelivDateIdx 
 ON      Orders ( 
   UNNEST  o_orderline 
   SELECT  ol_delivery_d : string
 );
-
-CREATE  TYPE StockType AS { s_w_id: bigint, s_i_id: bigint };
-CREATE  DATASET Stock (StockType) PRIMARY KEY s_w_id, s_i_id;
-CREATE  INDEX stockItemIdx
-ON      Stock ( s_i_id );
-
-CREATE  TYPE ItemType AS { i_id: bigint };
-CREATE  DATASET Item (ItemType) PRIMARY KEY i_id;
-
-CREATE  TYPE RegionType AS { r_regionkey: bigint };
-CREATE  DATASET Region (RegionType) PRIMARY KEY r_regionkey;
-
-CREATE  TYPE SupplierType AS { su_suppkey: bigint };
-CREATE  DATASET Supplier (SupplierType) PRIMARY KEY su_suppkey; 
+CREATE  INDEX orderlineItemIdx
+ON      Orders (
+  UNNEST  o_orderline
+  SELECT  ol_i_id : bigint
+);
 ```
 
 3. Load each dataset in the dataverse. Adjust the path accordingly.
@@ -125,22 +124,38 @@ python3 aconitum/_asterixdb.py
 
 ### Couchbase
 
-1. Ensure that Couchbase 7.0 is installed and configured on the node to run the experiments on. Docs on the install can be found [here](https://docs.couchbase.com/server/7.0/install/ubuntu-debian-install.html). Use the deb package instructions to get the latest and greatest. The memory for the Data service was allocated to be half of the system memory (4096 MB), and the only other service that was made available was the Index service (512 MB).
-2. Create the bucket to hold all of your data. This should utilize the entire cluster's memory data quota (4096 MB in this case). Change the bucket's ejection method policy from _Value-only_ to _Full_.
-3. Create the collections and indexes associated with each collection. The default scope of the bucket is used to house each collection.
+1. Ensure that Couchbase 7.0 is installed and configured on the node to run the experiments on. Docs on the install can be found [here](https://docs.couchbase.com/server/7.0/install/ubuntu-debian-install.html). Use the deb package instructions to get the latest and greatest. The memory for the Data service is half of the system memory (4096 MB). The only other service that is made available is the Index service (2048 MB). The `Max Parallelism` parameter should be set to the number of cores of your system (in our case, 4).
+2. Create the bucket to hold all of your data. This should utilize the entire cluster's memory-data quota (4096 MB in this case). Change the bucket's ejection-method policy from _Value-only_ to _Full_.
+3. Create the collections. The default scope of the bucket houses each collection.
 
 ```sql
 CREATE  COLLECTION aconitum._default.Customer;
+CREATE  COLLECTION aconitum._default.Nation;
+CREATE  COLLECTION aconitum._default.Orders;
+CREATE  COLLECTION aconitum._default.Stock;
+CREATE  COLLECTION aconitum._default.Item;
+CREATE  COLLECTION aconitum._default.Region;
+CREATE  COLLECTION aconitum._default.Supplier;
+```
+
+4. Build the indexes associated with each collection.
+
+```sql
 CREATE  INDEX customerPrimaryKeyIdx 
 ON      aconitum._default.Customer ( c_w_id, c_d_id, c_id );
-
-CREATE  COLLECTION aconitum._default.Nation;
 CREATE  INDEX nationPrimaryKeyIdx 
 ON      aconitum._default.Nation ( n_nationkey );
-
-CREATE  COLLECTION aconitum._default.Orders;
 CREATE  INDEX ordersPrimaryKeyIdx
 ON      aconitum._default.Orders ( o_w_id, o_d_id, o_id );
+CREATE  INDEX stockPrimaryKeyIdx
+ON      aconitum._default.Stock ( s_w_id, s_i_id );
+CREATE  INDEX itemPrimaryKeyIdx
+ON      aconitum._default.Item ( i_id );
+CREATE  INDEX regionPrimaryKeyIdx
+ON      aconitum._default.Region ( r_regionkey );
+CREATE  INDEX supplierPrimaryKeyIdx
+ON      aconitum._default.Supplier ( su_suppkey );
+
 CREATE  INDEX orderlineDelivDateIdx 
 ON      aconitum._default.Orders (
   DISTINCT  ARRAY OL.ol_delivery_d
@@ -148,27 +163,20 @@ ON      aconitum._default.Orders (
   IN        o_orderline 
   END
 );
-            
-CREATE  COLLECTION aconitum._default.Stock;
-CREATE  INDEX stockPrimaryKeyIdx
-ON      aconitum._default.Stock ( s_w_id, s_i_id );
-  
-CREATE  COLLECTION aconitum._default.Item;
-CREATE  INDEX itemPrimaryKeyIdx
-ON      aconitum._default.Item ( i_id );
+CREATE  INDEX orderlineItemIdx
+ON      aconitum._default.Orders (
+  DISTINCT  ARRAY OL.ol_i_id
+  FOR       OL 
+  IN        o_orderline 
+  END
+);
+CREATE  PRIMARY INDEX ordersPrimaryIdx
+ON      aconitum._default.Orders;
 CREATE  PRIMARY INDEX itemPrimaryIdx 
-ON      aconitum._default.Item; 
-
-CREATE  COLLECTION aconitum._default.Region;
-CREATE  INDEX regionPrimaryKeyIdx
-ON      aconitum._default.Region ( r_regionkey );
-
-CREATE  COLLECTION aconitum._default.Supplier;
-CREATE  INDEX supplierPrimaryKeyIdx
-ON      aconitum._default.Supplier ( su_suppkey );
+ON      aconitum._default.Item;
 ```
 
-4. Load each collection in the bucket. Adjust the path accordingly.
+5. Load each collection in the bucket. Adjust the path accordingly.
 
 ```bash
 for c in customer nation orders stock item region supplier; do
@@ -180,13 +188,13 @@ for c in customer nation orders stock item region supplier; do
 done
 ```
 
-5. Execute the benchmark query suite for Couchbase.
+6. Execute the benchmark query suite for Couchbase.
 
 ```bash
 python3 aconitum/_couchbase.py
 ```
 
-6. Analyze the results! The results will be stored in the `out` folder under `results.json` as single line JSON documents.
+7. Analyze the results! The results will be stored in the `out` folder under `results.json` as single line JSON documents.
 
 
 ### MongoDB
@@ -233,14 +241,47 @@ for c in customer nation orders stock item region supplier; do
 done
 ```
 
-4. Create the multi-valued index for this experiment.
+4. Create the indexes for this experiment.
 
 ```javascript
 use aconitum
 
-db.Orders.createIndex( 
+db.Customer.createIndex (
+  { "c_w_id": 1, "c_d_id": 1, "c_id": 1 },
+  { name: "customerPrimaryKeyIdx" }
+)
+db.Nation.createIndex (
+  { "n_nationkey": 1 },
+  { name: "nationPrimaryKeyIdx" }
+)
+db.Orders.createIndex (
+  { "o_w_id": 1, "o_d_id": 1, "o_id": 1 },
+  { name: "ordersPrimaryKeyIdx" }
+)
+db.Stock.createIndex (
+  { "s_w_id": 1, "s_i_id": 1 },
+  { name: "stockPrimaryKeyIdx" }
+)
+db.Item.createIndex (
+  { "i_id": 1 },
+  { name: "itemPrimaryKeyIdx" }
+)
+db.Region.createIndex (
+  { "r_regionkey": 1 },
+  { name: "regionPrimaryKeyIdx" }
+)
+db.Supplier.createIndex (
+  { "su_suppkey": 1 },
+  { name: "supplierPrimaryKeyIdx" }
+)
+
+db.Orders.createIndex ( 
 	{ "o_orderline.ol_delivery_d": 1 }, 
 	{ name: "orderlineDelivDateIdx" } 
+)
+db.Orders.createIndex (
+  { "o_orderline.ol_i_id": 1 },
+  { name: "orderlineItemIdx" }
 )
 ```
 

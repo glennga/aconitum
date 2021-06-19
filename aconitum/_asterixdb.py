@@ -18,13 +18,7 @@ class AsterixDBBenchmarkQuerySuite(AbstractBenchmarkQuerySuite):
 
     def execute_sqlpp(self, statement, timeout=None):
         lean_statement = ' '.join(statement.split())
-        query_parameters = {
-            'statement': lean_statement,
-            'plan-format': 'STRING',
-            'optimized-logical-plan': True,
-            'logical-plan': True,
-            'job': True
-        }
+        query_parameters = {'statement': lean_statement}
 
         # Retry the query until success.
         while True:
@@ -48,41 +42,88 @@ class AsterixDBBenchmarkQuerySuite(AbstractBenchmarkQuerySuite):
                                 f'but instead {response_json["status"]}.')
             self.logger.warning(f'JSON dump: {response_json}')
 
-        # We get our job as a JSON string, but it would be beneficial to store this as an object.
-        if 'plans' in response_json and 'job' in response_json['plans']:
-            response_json['plans']['job'] = json.loads(response_json['plans']['job'])
-
         # Add the query to response.
         response_json['statement'] = lean_statement
         return response_json
 
-    def query_0_factory(self) -> AbstractBenchmarkQueryRunnable:
-        class _Query0Runnable(AbstractBenchmarkQueryRunnable):
+    def query_a_factory(self) -> AbstractBenchmarkQueryRunnable:
+        class _QueryARunnable(AbstractBenchmarkQueryRunnable):
             def __init__(self, query_suite):
-                super(_Query0Runnable, self).__init__('0')
+                super(_QueryARunnable, self).__init__('A', query_suite.generate_dates)
                 self.query_suite = query_suite
 
-            def invoke(self, date_1, date_2, timeout) -> dict:
+            def invoke(self, v0, v1, timeout) -> dict:
                 return self.query_suite.execute_sqlpp(f"""
                     {self.query_suite.query_prefix}
-                    FROM    Orders O, O.o_orderline OL
-                    WHERE   OL.ol_delivery_d BETWEEN '{date_1}' AND '{date_2}'
-                    SELECT  COUNT(*) AS count_order;
+                    FROM       Orders O, O.o_orderline OL
+                    WHERE      OL.ol_delivery_d BETWEEN '{v0}' AND '{v1}'
+                    SELECT     COUNT(*);
                 """, timeout=timeout)
 
-        return _Query0Runnable(query_suite=self)
+        return _QueryARunnable(query_suite=self)
+
+    def query_b_factory(self) -> AbstractBenchmarkQueryRunnable:
+        class _QueryBRunnable(AbstractBenchmarkQueryRunnable):
+            def __init__(self, query_suite):
+                super(_QueryBRunnable, self).__init__('B', query_suite.generate_dates)
+                self.query_suite = query_suite
+
+            def invoke(self, v0, v1, timeout) -> dict:
+                return self.query_suite.execute_sqlpp(f"""
+                    {self.query_suite.query_prefix}
+                    FROM       Orders O
+                    WHERE      SOME OL IN O.o_orderline 
+                               SATISFIES  OL.ol_delivery_d BETWEEN '{v0}' AND '{v1}'
+                    SELECT     COUNT(*) AS count_order;
+                """, timeout=timeout)
+
+        return _QueryBRunnable(query_suite=self)
+
+    def query_c_factory(self) -> AbstractBenchmarkQueryRunnable:
+        class _QueryCRunnable(AbstractBenchmarkQueryRunnable):
+            def __init__(self, query_suite):
+                super(_QueryCRunnable, self).__init__('C', query_suite.generate_dates)
+                self.query_suite = query_suite
+
+            def invoke(self, v0, v1, timeout) -> dict:
+                return self.query_suite.execute_sqlpp(f"""
+                    {self.query_suite.query_prefix}
+                    FROM       Orders O
+                    WHERE      LEN (O.o_orderline) > 0 AND EVERY OL IN O.o_orderline 
+                               SATISFIES  OL.ol_delivery_d BETWEEN '{v0}' AND '{v1}'
+                    SELECT     COUNT(*) AS count_order;
+                """, timeout=timeout)
+
+        return _QueryCRunnable(query_suite=self)
+
+    def query_d_factory(self) -> AbstractBenchmarkQueryRunnable:
+        class _QueryDRunnable(AbstractBenchmarkQueryRunnable):
+            def __init__(self, query_suite):
+                super(_QueryDRunnable, self).__init__('D', query_suite.generate_items)
+                self.query_suite = query_suite
+
+            def invoke(self, v0, v1, timeout) -> dict:
+                return self.query_suite.execute_sqlpp(f"""
+                    {self.query_suite.query_prefix}
+                    FROM       Item I, Orders O, O.o_orderline OL
+                    WHERE      I.i_id BETWEEN '{v0}' AND '{v1}' AND 
+                               I.i_id /* +indexnl */ = OL.ol_i_id
+                    SELECT     COUNT(*) AS count_order_item;
+                """, timeout=timeout)
+
+        return _QueryDRunnable(query_suite=self)
 
     def query_1_factory(self) -> AbstractBenchmarkQueryRunnable:
         class _Query1Runnable(AbstractBenchmarkQueryRunnable):
             def __init__(self, query_suite):
-                super(_Query1Runnable, self).__init__('1')
+                super(_Query1Runnable, self).__init__('1', query_suite.generate_dates)
                 self.query_suite = query_suite
 
-            def invoke(self, date_1, date_2, timeout) -> dict:
+            def invoke(self, v0, v1, timeout) -> dict:
                 return self.query_suite.execute_sqlpp(f"""
                     {self.query_suite.query_prefix}
                     FROM        Orders O, O.o_orderline OL
-                    WHERE       OL.ol_delivery_d BETWEEN '{date_1}' AND '{date_2}'
+                    WHERE       OL.ol_delivery_d BETWEEN '{v0}' AND '{v1}'
                     GROUP BY    OL.ol_number
                     SELECT      OL.ol_number, SUM(OL.ol_quantity) AS sum_qty, SUM(OL.ol_amount) AS sum_amount,
                                 AVG(OL.ol_quantity) AS avg_qty, AVG(OL.ol_amount) AS avg_amount, 
@@ -95,14 +136,14 @@ class AsterixDBBenchmarkQuerySuite(AbstractBenchmarkQuerySuite):
     def query_6_factory(self) -> AbstractBenchmarkQueryRunnable:
         class _Query6Runnable(AbstractBenchmarkQueryRunnable):
             def __init__(self, query_suite):
-                super(_Query6Runnable, self).__init__('6')
+                super(_Query6Runnable, self).__init__('6', query_suite.generate_dates)
                 self.query_suite = query_suite
 
-            def invoke(self, date_1, date_2, timeout) -> dict:
+            def invoke(self, v0, v1, timeout) -> dict:
                 return self.query_suite.execute_sqlpp(f"""
                     {self.query_suite.query_prefix}
                     FROM    Orders O, O.o_orderline OL
-                    WHERE   OL.ol_delivery_d BETWEEN '{date_1}' AND '{date_2}' AND 
+                    WHERE   OL.ol_delivery_d BETWEEN '{v0}' AND '{v1}' AND 
                             OL.ol_quantity BETWEEN 1 AND 100000
                     SELECT  SUM(OL.ol_amount) AS revenue;
                 """, timeout=timeout)
@@ -112,10 +153,10 @@ class AsterixDBBenchmarkQuerySuite(AbstractBenchmarkQuerySuite):
     def query_7_factory(self) -> AbstractBenchmarkQueryRunnable:
         class _Query7Runnable(AbstractBenchmarkQueryRunnable):
             def __init__(self, query_suite):
-                super(_Query7Runnable, self).__init__('7')
+                super(_Query7Runnable, self).__init__('7', query_suite.generate_dates)
                 self.query_suite = query_suite
 
-            def invoke(self, date_1, date_2, timeout) -> dict:
+            def invoke(self, v0, v1, timeout) -> dict:
                 return self.query_suite.execute_sqlpp(f"""
                     {self.query_suite.query_prefix}
                     FROM        Supplier SU, Stock S, Orders O, O.o_orderline OL, Customer C, Nation N1, Nation N2
@@ -129,7 +170,7 @@ class AsterixDBBenchmarkQuerySuite(AbstractBenchmarkQuerySuite):
                                 STRING_TO_CODEPOINT(SUBSTR(C.c_state, 1, 1))[0]  = N2.n_nationkey AND
                                 ( ( N1.n_name = 'Germany' AND N2.n_name = 'Cambodia' ) OR
                                   ( N1.n_name = 'Cambodia' AND N2.n_name = 'Germany' ) ) AND
-                                OL.ol_delivery_d BETWEEN '{date_1}' AND '{date_2}'
+                                OL.ol_delivery_d BETWEEN '{v0}' AND '{v1}'
                     GROUP BY    SU.su_nationkey, STRING_TO_CODEPOINT(SUBSTR(C.c_state, 1, 1))[0], 
                                 SUBSTR(O.o_entry_d, 0, 4)
                     SELECT      SU.su_nationkey AS supp_nation, 
@@ -143,15 +184,15 @@ class AsterixDBBenchmarkQuerySuite(AbstractBenchmarkQuerySuite):
     def query_12_factory(self) -> AbstractBenchmarkQueryRunnable:
         class _Query12Runnable(AbstractBenchmarkQueryRunnable):
             def __init__(self, query_suite):
-                super(_Query12Runnable, self).__init__('12')
+                super(_Query12Runnable, self).__init__('12', query_suite.generate_dates)
                 self.query_suite = query_suite
 
-            def invoke(self, date_1, date_2, timeout) -> dict:
+            def invoke(self, v0, v1, timeout) -> dict:
                 return self.query_suite.execute_sqlpp(f"""
                     {self.query_suite.query_prefix}
                     FROM        Orders O, O.o_orderline OL
                     WHERE       O.o_entry_d <= OL.ol_delivery_d AND 
-                                OL.ol_delivery_d BETWEEN '{date_1}' AND '{date_2}'
+                                OL.ol_delivery_d BETWEEN '{v0}' AND '{v1}'
                     GROUP BY    O.o_ol_cnt
                     SELECT      O.o_ol_cnt, 
                                 SUM(CASE WHEN O.o_carrier_id = 1 OR O.o_carrier_id = 2 
@@ -166,15 +207,15 @@ class AsterixDBBenchmarkQuerySuite(AbstractBenchmarkQuerySuite):
     def query_14_factory(self) -> AbstractBenchmarkQueryRunnable:
         class _Query14Runnable(AbstractBenchmarkQueryRunnable):
             def __init__(self, query_suite):
-                super(_Query14Runnable, self).__init__('14')
+                super(_Query14Runnable, self).__init__('14', query_suite.generate_dates)
                 self.query_suite = query_suite
 
-            def invoke(self, date_1, date_2, timeout) -> dict:
+            def invoke(self, v0, v1, timeout) -> dict:
                 return self.query_suite.execute_sqlpp(f"""
                     {self.query_suite.query_prefix}
                     FROM    Item I, Orders O, O.o_orderline OL
                     WHERE   OL.ol_i_id = I.i_id AND 
-                            OL.ol_delivery_d BETWEEN '{date_1}' AND '{date_2}'
+                            OL.ol_delivery_d BETWEEN '{v0}' AND '{v1}'
                     SELECT  100.00 * SUM(CASE WHEN I.i_data LIKE 'pr%' THEN OL.ol_amount ELSE 0 END) / 
                                 (1 + SUM(OL.ol_amount)) AS promo_revenue;
                 """, timeout=timeout)
@@ -184,17 +225,17 @@ class AsterixDBBenchmarkQuerySuite(AbstractBenchmarkQuerySuite):
     def query_15_factory(self) -> AbstractBenchmarkQueryRunnable:
         class _Query15Runnable(AbstractBenchmarkQueryRunnable):
             def __init__(self, query_suite):
-                super(_Query15Runnable, self).__init__('15')
+                super(_Query15Runnable, self).__init__('15', query_suite.generate_dates)
                 self.query_suite = query_suite
 
-            def invoke(self, date_1, date_2, timeout) -> dict:
+            def invoke(self, v0, v1, timeout) -> dict:
                 return self.query_suite.execute_sqlpp(f"""
                     {self.query_suite.query_prefix}
                     WITH        Revenue AS (
                                 FROM        Stock S, Orders O, O.o_orderline OL
                                 WHERE       OL.ol_i_id = S.s_i_id AND 
                                             OL.ol_supply_w_id = S.s_w_id AND
-                                            OL.ol_delivery_d BETWEEN '{date_1}' AND '{date_2}'
+                                            OL.ol_delivery_d BETWEEN '{v0}' AND '{v1}'
                                 GROUP BY    ((S.s_w_id * S.s_i_id) % 10000)
                                 SELECT      ((S.s_w_id * S.s_i_id) % 10000) AS supplier_no, 
                                             SUM(OL.ol_amount) AS total_revenue
@@ -214,10 +255,10 @@ class AsterixDBBenchmarkQuerySuite(AbstractBenchmarkQuerySuite):
     def query_20_factory(self) -> AbstractBenchmarkQueryRunnable:
         class _Query20Runnable(AbstractBenchmarkQueryRunnable):
             def __init__(self, query_suite):
-                super(_Query20Runnable, self).__init__('20')
+                super(_Query20Runnable, self).__init__('20', query_suite.generate_dates)
                 self.query_suite = query_suite
 
-            def invoke(self, date_1, date_2, timeout) -> dict:
+            def invoke(self, v0, v1, timeout) -> dict:
                 return self.query_suite.execute_sqlpp(f"""
                     {self.query_suite.query_prefix}
                     FROM        Supplier SU, Nation N
@@ -229,7 +270,7 @@ class AsterixDBBenchmarkQuerySuite(AbstractBenchmarkQuerySuite):
                                             WHERE   I.i_data LIKE 'co%'
                                             ) AND 
                                             OL.ol_i_id = S.s_i_id AND 
-                                            OL.ol_delivery_d BETWEEN '{date_1}' AND '{date_2}'
+                                            OL.ol_delivery_d BETWEEN '{v0}' AND '{v1}'
                                 GROUP BY    S.s_i_id, S.s_w_id, S.s_quantity
                                 HAVING      (100 * S.s_quantity) > SUM(OL.ol_quantity)
                                 SELECT      VALUE ((S.s_w_id * S.s_i_id) % 10000)
