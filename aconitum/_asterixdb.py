@@ -89,8 +89,8 @@ class AsterixDBBenchmarkQuerySuite(AbstractBenchmarkQuerySuite):
                 return self.query_suite.execute_sqlpp(f"""
                     {self.query_suite.query_prefix}
                     FROM       Orders O
-                    WHERE      LEN (O.o_orderline) > 0 AND EVERY OL IN O.o_orderline 
-                               SATISFIES  OL.ol_delivery_d BETWEEN '{v0}' AND '{v1}'
+                    WHERE      SOME AND EVERY OL IN O.o_orderline 
+                               SATISFIES OL.ol_delivery_d BETWEEN '{v0}' AND '{v1}'
                     SELECT     COUNT(*) AS count_order;
                 """, timeout=timeout)
 
@@ -107,7 +107,7 @@ class AsterixDBBenchmarkQuerySuite(AbstractBenchmarkQuerySuite):
                     {self.query_suite.query_prefix}
                     FROM       Item I, Orders O, O.o_orderline OL
                     WHERE      I.i_id BETWEEN '{v0}' AND '{v1}' AND 
-                               I.i_id /* +indexnl */ = OL.ol_i_id
+                               TO_BIGINT(I.i_id) /* +indexnl */ = OL.ol_i_id
                     SELECT     COUNT(*) AS count_order_item;
                 """, timeout=timeout)
 
@@ -232,7 +232,7 @@ class AsterixDBBenchmarkQuerySuite(AbstractBenchmarkQuerySuite):
                 return self.query_suite.execute_sqlpp(f"""
                     {self.query_suite.query_prefix}
                     WITH        Revenue AS (
-                                FROM        Stock S, Orders O, O.o_orderline OL
+                                FROM        Orders O, O.o_orderline OL, Stock S
                                 WHERE       OL.ol_i_id = S.s_i_id AND 
                                             OL.ol_supply_w_id = S.s_w_id AND
                                             OL.ol_delivery_d BETWEEN '{v0}' AND '{v1}'
