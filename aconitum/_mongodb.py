@@ -440,7 +440,7 @@ class MongoDBBenchmarkRunnable(AbstractBenchmarkRunnable):
     def _collect_config(**kwargs):
         parser = argparse.ArgumentParser(description='Benchmark TPC_CH queries on a MongoDB instance.')
         parser.add_argument('--config', type=str, default='config/mongodb.json', help='Path to the config file.')
-        parser.add_argument('--datagen', type=str, default='config/tpc_ch.json', help='Path to the datagen file.')
+        parser.add_argument('--tpcch', type=str, default='config/tpc_ch.json', help='Path to the TPC_CH file.')
         parser.add_argument('--aconitum', type=str, default='config/aconitum.json', help='Path to the experiment file.')
         parser.add_argument('--notes', type=str, default='', help='Any notes to append to each log entry.')
         parser_args = parser.parse_args()
@@ -448,8 +448,8 @@ class MongoDBBenchmarkRunnable(AbstractBenchmarkRunnable):
         # Load all configuration files into a single dictionary.
         with open(parser_args.config) as config_file:
             config_json = json.load(config_file)
-        with open(parser_args.datagen) as datagen_file:
-            config_json['tpcCH'] = json.load(datagen_file)
+        with open(parser_args.tpcch) as tpcch_file:
+            config_json['tpcCH'] = json.load(tpcch_file)
         with open(parser_args.aconitum) as experiment_file:
             config_json['experiment'] = json.load(experiment_file)
 

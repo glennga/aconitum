@@ -1,6 +1,9 @@
 {
   "dataPath": "resources/tpc_ch",
-  "numWarehouses": 200,
+  "numWarehouses": 500,
   "scaleFactor": 1,
-  "runDate": "2021-01-01 00:00:00"
+  "runDate": "2021-01-01 00:00:00",
+  "excludeQueries": [
+    "A", "1"
+  ]
 }

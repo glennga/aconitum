@@ -2,8 +2,8 @@ import datetime
 import abc
 import random
 import math
-
 import faker
+import natsort
 
 from dateutil import relativedelta
 
@@ -60,12 +60,17 @@ class AbstractBenchmarkQuerySuite(abc.ABC):
         self.config = kwargs
         self.faker = faker.Faker()
         self.factory_pointer = 0
-        self.factory_list = [
-            self.query_a_factory, self.query_b_factory, self.query_c_factory, self.query_d_factory,
-            self.query_1_factory, self.query_6_factory, self.query_7_factory, self.query_12_factory,
-            self.query_14_factory, self.query_15_factory, self.query_20_factory
-        ]
         self.logger = kwargs['logger']
+
+        exclude_queries_set = set([q.capitalize() for q in kwargs['excludeQueries']])
+        all_queries_set = set([(m.removeprefix('query_').removesuffix('_factory').capitalize(), m)
+                               for m in dir(AbstractBenchmarkQuerySuite) if m.startswith('query')])
+        for query, factory_name in natsort.natsorted(all_queries_set, key=lambda a: a[0]):
+            if query not in exclude_queries_set:
+                if hasattr(self, 'factory_list'):
+                    self.factory_list.append(getattr(AbstractBenchmarkQuerySuite, factory_name))
+                else:
+                    self.factory_list = [getattr(AbstractBenchmarkQuerySuite, factory_name)]
 
     def __iter__(self):
         return self
