@@ -95,7 +95,7 @@ class CouchbaseBenchmarkQuerySuite(AbstractBenchmarkQuerySuite):
                     UNNEST     O.o_orderline OL
                     JOIN       {self.query_suite.keyspace_prefix}.Item I
                     ON         I.i_id = OL.ol_i_id
-                    WHERE      I.i_id BETWEEN '{v0}' AND '{v1}'
+                    WHERE      I.i_id BETWEEN {v0} AND {v1}
                     SELECT     COUNT(*) AS count_order_item;
                 """, timeout=timeout)
 

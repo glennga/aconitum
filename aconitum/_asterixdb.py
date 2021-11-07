@@ -106,7 +106,7 @@ class AsterixDBBenchmarkQuerySuite(AbstractBenchmarkQuerySuite):
                 return self.query_suite.execute_sqlpp(f"""
                     {self.query_suite.query_prefix}
                     FROM       Item I, Orders O, O.o_orderline OL
-                    WHERE      I.i_id BETWEEN '{v0}' AND '{v1}' AND 
+                    WHERE      I.i_id BETWEEN {v0} AND {v1} AND 
                                TO_BIGINT(I.i_id) /* +indexnl */ = OL.ol_i_id
                     SELECT     COUNT(*) AS count_order_item;
                 """, timeout=timeout)
