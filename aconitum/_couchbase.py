@@ -75,7 +75,7 @@ class CouchbaseBenchmarkQuerySuite(AbstractBenchmarkQuerySuite):
             def invoke(self, v0, v1, timeout) -> dict:
                 return self.query_suite.execute_n1ql(f"""
                     FROM        {self.query_suite.keyspace_prefix}.Orders O
-                    WHERE       LEN(O.o_orderline) > 0 AND EVERY OL IN O.o_orderline
+                    WHERE       SOME AND EVERY OL IN O.o_orderline
                                 SATISFIES OL.ol_delivery_d BETWEEN "{v0}" AND "{v1}"
                                 END
                     SELECT      COUNT(*) AS count_order;
