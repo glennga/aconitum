@@ -5,7 +5,7 @@ This repository contains scripts to test various TPC-CH queries across AsterixDB
 All experiments have been executed on AWS EC2 instances. Each node was of type `c5.xlarge` (4 CPUs @ 3.4GHz, 8GB of RAM) with 3000 IOPS SSDs attached. Each node was running Ubuntu Server 20.04 LTS. We record the client response time here, so each experiment executed local to each database server (to minimize client-server communication latencies). 
 
 ### TPC CH(2)
-A modified TPC-CH was utilized here, one that a) more naturally represents orderlines within orders as nested documents, and b) has orderline dates that are uniformly distributed across 7 years. The parameters used for TPC-CH generator were `scaleFactor=1` and `numWarehouses=200`.
+A modified TPC-CH was utilized here, one that a) more naturally represents orderlines within orders as nested documents, and b) has orderline dates that are uniformly distributed across 7 years. The parameters used for TPC-CH generator were `scaleFactor=1` and `numWarehouses=500`.
 
 ### All Systems
 
@@ -47,7 +47,8 @@ log.dir=logs/
 log.level=INFO
 ```
 
-2. Create the dataverse required for this experiment. We build one secondary index on the orderline delivery dates.
+2. Create the dataverse required for this experiment. 
+
 ```sql
 DROP    DATAVERSE TPC_CH IF EXISTS;
 CREATE  DATAVERSE TPC_CH;
@@ -68,17 +69,6 @@ CREATE  DATASET Stock (StockType) PRIMARY KEY s_w_id, s_i_id;
 CREATE  DATASET Item (ItemType) PRIMARY KEY i_id;
 CREATE  DATASET Region (RegionType) PRIMARY KEY r_regionkey;
 CREATE  DATASET Supplier (SupplierType) PRIMARY KEY su_suppkey; 
-
-CREATE  INDEX orderlineDelivDateIdx 
-ON      Orders ( 
-  UNNEST  o_orderline 
-  SELECT  ol_delivery_d : string
-);
-CREATE  INDEX orderlineItemIdx
-ON      Orders (
-  UNNEST  o_orderline
-  SELECT  ol_i_id : bigint
-);
 ```
 
 3. Load each dataset in the dataverse. Adjust the path accordingly.
@@ -114,13 +104,29 @@ LOAD DATASET TPC_CH.Supplier USING localfs (
 ); 
 ```
 
-4. Execute the benchmark query suite for AsterixDB.
+4. Build our secondary indexes. This is a separate step to speed-up the previous loading phase.
+
+```sql
+USE     TPC_CH;
+CREATE  INDEX orderlineDelivDateIdx 
+ON      Orders ( 
+  UNNEST  o_orderline 
+  SELECT  ol_delivery_d : string
+) EXCLUDE UNKNOWN KEY;
+CREATE  INDEX orderlineItemIdx
+ON      Orders (
+  UNNEST  o_orderline
+  SELECT  ol_i_id : bigint
+) EXCLUDE UNKNOWN KEY;
+```
+
+5. Execute the benchmark query suite for AsterixDB.
 
 ```bash
 python3 aconitum/_asterixdb.py
 ```
 
-5. Analyze the results! The results will be stored in the `out` folder under `results.json` as single line JSON documents.
+6. Analyze the results! The results will be stored in the `out` folder under `results.json` as single line JSON documents.
 
 ### Couchbase
 
@@ -138,7 +144,19 @@ CREATE  COLLECTION aconitum._default.Region;
 CREATE  COLLECTION aconitum._default.Supplier;
 ```
 
-4. Build the indexes associated with each collection.
+4. Load each collection in the bucket. Adjust the path accordingly.
+
+```bash
+for c in customer nation orders stock item region supplier; do
+  /opt/couchbase/bin/cbimport json \
+    --cluster localhost --username "admin" --password "password" \
+    --bucket "aconitum" --scope-collection-exp _default.${c^} \
+    --dataset file:///home/ubuntu/aconitum/resources/tpc_ch/$c.json \
+    --format lines --generate-key key::#UUID#
+done
+```
+
+5. Build the indexes associated with each collection.
 
 ```sql
 CREATE  INDEX customerPrimaryKeyIdx 
@@ -176,18 +194,6 @@ CREATE  PRIMARY INDEX itemPrimaryIdx
 ON      aconitum._default.Item;
 ```
 
-5. Load each collection in the bucket. Adjust the path accordingly.
-
-```bash
-for c in customer nation orders stock item region supplier; do
-  /opt/couchbase/bin/cbimport json \
-    --cluster localhost --username "admin" --password "password" \
-    --bucket "aconitum" --scope-collection-exp _default.${c^} \
-    --dataset file:///home/ubuntu/aconitum/resources/tpc_ch/$c.json \
-    --format lines --generate-key key::#UUID#
-done
-```
-
 6. Execute the benchmark query suite for Couchbase.
 
 ```bash
@@ -207,7 +213,7 @@ use admin
 db.createUser ({
   user: "admin",
   pwd: "password",
-  roles: [ { role: "userAdminAnyDatabase", db: "admin" }, "readWriteAnyDatabase" ]
+  roles: [ "root" ]
 })
 ```
 
