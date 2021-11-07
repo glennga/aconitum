@@ -281,9 +281,9 @@ db.Supplier.createIndex (
   { name: "supplierPrimaryKeyIdx" }
 )
 
-db.Orders.createIndex ( 
-	{ "o_orderline.ol_delivery_d": 1 }, 
-	{ name: "orderlineDelivDateIdx" } 
+db.Orders.createIndex (
+  { "o_orderline.ol_delivery_d": 1 }, 
+  { name: "orderlineDelivDateIdx" } 
 )
 db.Orders.createIndex (
   { "o_orderline.ol_i_id": 1 },
