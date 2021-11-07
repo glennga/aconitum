@@ -8,5 +8,5 @@
       "localhost"
     ]
   },
-  "package": "resources/asterixdb"
+  "queryPrefix": "SET `compiler.arrayindex` \"true\";\nUSE TPC_CH;"
 }

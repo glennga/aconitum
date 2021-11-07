@@ -12,8 +12,8 @@ from aconitum.executor import AbstractBenchmarkRunnable
 class AsterixDBBenchmarkQuerySuite(AbstractBenchmarkQuerySuite):
     def __init__(self, nc_uri, logger, **kwargs):
         super().__init__(logger=logger, **kwargs)
+        self.query_prefix = kwargs['query_prefix']
         self.nc_uri = nc_uri
-        self.query_prefix = '\nUSE TPC_CH;\nSET `compiler.arrayindex` "true";\n'
         self.logger = logger
 
     def execute_sqlpp(self, statement, timeout=None):
@@ -289,7 +289,7 @@ class AsterixDBBenchmarkRunnable(AbstractBenchmarkRunnable):
     def _collect_config(**kwargs):
         parser = argparse.ArgumentParser(description='Benchmark TPC_CH queries on an AsterixDB instance.')
         parser.add_argument('--config', type=str, default='config/asterixdb.json', help='Path to the config file.')
-        parser.add_argument('--datagen', type=str, default='config/tpc_ch.json', help='Path to the datagen file.')
+        parser.add_argument('--tpcch', type=str, default='config/tpc_ch.json', help='Path to the TPC_CH file.')
         parser.add_argument('--aconitum', type=str, default='config/aconitum.json', help='Path to the experiment file.')
         parser.add_argument('--notes', type=str, default='', help='Any notes to append to each log entry.')
         parser_args = parser.parse_args()
@@ -297,8 +297,8 @@ class AsterixDBBenchmarkRunnable(AbstractBenchmarkRunnable):
         # Load all configuration files into a single dictionary.
         with open(parser_args.config) as config_file:
             config_json = json.load(config_file)
-        with open(parser_args.datagen) as datagen_file:
-            config_json['tpcCH'] = json.load(datagen_file)
+        with open(parser_args.tpcch) as tpcch_file:
+            config_json['tpcCH'] = json.load(tpcch_file)
         with open(parser_args.aconitum) as experiment_file:
             config_json['experiment'] = json.load(experiment_file)
 
@@ -322,6 +322,7 @@ class AsterixDBBenchmarkRunnable(AbstractBenchmarkRunnable):
         for i in range(self.config['experiment']['repeat']):
             for sigma in self.config['experiment']['sigmaValues']:
                 for query in AsterixDBBenchmarkQuerySuite(
+                    query_prefix=self.config['queryPrefix'],
                     nc_uri=self.nc_uri,
                     logger=self.logger,
                     **self.config['tpcCH']
