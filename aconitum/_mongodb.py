@@ -30,8 +30,14 @@ class MongoDBBenchmarkQuerySuite(AbstractBenchmarkQuerySuite):
         elif count is not None and aggregate is not None:
             raise ValueError("Both predicate and aggregate cannot be specified at the same time.")
 
+        # Attempt to get a plan before executing the query, in case we time out.
+        plan = []
+
         try:
             if count is not None:
+                plan = self.database.command('explain', {
+                    'count': name, 'query': count
+                }, verbosity='queryPlanner')['queryPlanner']['winningPlan']
                 t_before = timeit.default_timer()
                 query_results = [{
                     'order_count': collection.count_documents(count, maxTimeMS=timeout)
@@ -41,6 +47,9 @@ class MongoDBBenchmarkQuerySuite(AbstractBenchmarkQuerySuite):
                 query = count
 
             else:  # aggregate is not None
+                plan = self.database.command('explain', {
+                    'aggregate': name, 'pipeline': aggregate, 'cursor': {}
+                }, verbosity='queryPlanner')['stages']
                 t_before = timeit.default_timer()
                 query_results = [
                     self._format_strict(r) for r in
@@ -60,7 +69,8 @@ class MongoDBBenchmarkQuerySuite(AbstractBenchmarkQuerySuite):
             status = 'timeout'
             query = count if count is not None else aggregate
 
-        return {'queryResults': query_results, 'clientTime': client_time, 'status': status, 'query': query}
+        return {'queryResults': query_results, 'clientTime': client_time, 'status': status,
+                'query': query, 'plan': plan}
 
     def query_a_factory(self) -> AbstractBenchmarkQueryRunnable:
         class _QueryARunnable(AbstractBenchmarkQueryRunnable):
@@ -238,8 +248,120 @@ class MongoDBBenchmarkQuerySuite(AbstractBenchmarkQuerySuite):
         return _Query6Runnable(query_suite=self)
 
     def query_7_factory(self) -> AbstractBenchmarkQueryRunnable:
-        self.logger.info('Query 7 is not implemented. Generating no-op runnable.')
-        return NoOpBenchmarkQueryRunnable('7')
+        class _Query7Runnable(AbstractBenchmarkQueryRunnable):
+            def __init__(self, query_suite):
+                super(_Query7Runnable, self).__init__('7', query_suite.generate_dates)
+                self.query_suite = query_suite
+
+            def invoke(self, v0, v1, timeout) -> dict:
+                return self.query_suite.execute_select(**{
+                    'name': 'Orders',
+                    'count': None,
+                    'aggregate': [
+                        {
+                            '$match': {'o_orderline': {
+                                '$elemMatch': {'ol_delivery_d': {'$gte': v0, '$lte': v1}}}
+                            }
+                        },
+                        {
+                            '$unwind': {'path': '$o_orderline'}
+                        },
+                        {
+                            '$lookup': {'from': 'Stock',
+                                        'localField': 'o_orderline.ol_i_id',
+                                        'foreignField': 's_i_id',
+                                        'as': 'stock'}
+                        },
+                        {
+                            '$unwind': {'path': '$stock'}
+                        },
+                        {
+                            '$match': {'$expr': {
+                                '$eq': ['$o_orderline.ol_supply_w_id', '$stock.s_w_id']
+                            }}
+                        },
+                        {
+                            '$addFields': {
+                                'supplier_no': {'$mod': [{'$multiply': ['$stock.s_w_id', '$stock.s_i_id']}, 10000]}
+                            }
+                        },
+                        {
+                            '$lookup': {'from': 'Supplier',
+                                        'localField': 'supplier_no',
+                                        'foreignField': 'su_suppkey',
+                                        'as': 'supplier'}
+                        },
+                        {
+                            '$unwind': {'path': '$supplier'}
+                        },
+                        {
+                            '$lookup': {'from': 'Customer',
+                                        'localField': 'o_c_id',
+                                        'foreignField': 'c_id',
+                                        'as': 'customer'}
+                        },
+                        {
+                            '$unwind': {'path': '$customer'}
+                        },
+                        {
+                            '$match': {'$expr': {
+                                '$and': [{'$eq': ['$customer.c_w_id', '$o_w_id']},
+                                         {'$eq': ['$customer.c_d_id', '$o_d_id']}]
+                            }}
+                        },
+                        {
+                            '$lookup': {'from': 'Nation',
+                                        'localField': 'supplier.su_nationkey',
+                                        'foreignField': 'n_nationkey',
+                                        'as': 'nation1'}
+                        },
+                        {
+                            '$unwind': {'path': '$nation1'}
+                        },
+                        {
+                            '$addFields': {
+                                'nationkey': {'$function': {
+                                    'body': 'function(inputString) { return inputString.codePointAt(0); }',
+                                    'args': [{'$substr': ['$customer.c_state', 1, 1]}],
+                                    'lang': 'js'
+                                }}
+                            }
+                        },
+                        {
+                            '$lookup': {'from': 'Nation',
+                                        'localField': 'nationkey',
+                                        'foreignField': 'n_nationkey',
+                                        'as': 'nation2'}
+                        },
+                        {
+                            '$unwind': {'path': '$nation2'}
+                        },
+                        {
+                            '$match': {'$expr': {
+                                '$or': [{'$and': [{'$eq': ['$nation1.n_name', 'Germany']},
+                                                  {'$eq': ['$nation2.n_name', 'Cambodia']}]},
+                                        {'$and': [{'$eq': ['$nation1.n_name', 'Cambodia']},
+                                                  {'$eq': ['$nation2.n_name', 'Germany']}]}]
+                            }}
+                        },
+                        {
+                            '$group': {
+                                '_id': {
+                                    'supp_nation': '$supplier.su_nationkey',
+                                    'cust_nation': '$nationkey',
+                                    'l_year': {'$substr': ['o_entry_d', 0, 4]}
+                                },
+                                'revenue': {'$sum': '$o_orderline.ol_amount'}
+                            }
+                        },
+                        {
+                            '$sort': {'supp_nation': 1, 'cust_nation': 1, 'l_year': 1}
+                        }
+                    ],
+                    'timeout': timeout * 1000
+                })
+
+        return _Query7Runnable(query_suite=self)
 
     def query_12_factory(self) -> AbstractBenchmarkQueryRunnable:
         class _Query12Runnable(AbstractBenchmarkQueryRunnable):
@@ -431,8 +553,96 @@ class MongoDBBenchmarkQuerySuite(AbstractBenchmarkQuerySuite):
         return _Query15Runnable(query_suite=self)
 
     def query_20_factory(self) -> AbstractBenchmarkQueryRunnable:
-        self.logger.info('Query 20 is not implemented. Generating no-op runnable.')
-        return NoOpBenchmarkQueryRunnable('20')
+        class _Query20Runnable(AbstractBenchmarkQueryRunnable):
+            def __init__(self, query_suite):
+                super(_Query20Runnable, self).__init__('20', query_suite.generate_dates)
+                self.query_suite = query_suite
+
+            def invoke(self, v0, v1, timeout) -> dict:
+                return self.query_suite.execute_select(**{
+                    'name': 'Orders',
+                    'count': None,
+                    'aggregate': [
+                        {
+                            '$match': {'o_orderline': {
+                                '$elemMatch': {'ol_delivery_d': {'$gte': v0, '$lte': v1}}}
+                            }
+                        },
+                        {
+                            '$unwind': {'path': '$o_orderline'}
+                        },
+                        {
+                            '$lookup': {'from': 'Stock',
+                                        'localField': 'o_orderline.ol_i_id',
+                                        'foreignField': 's_i_id',
+                                        'as': 'stock'}
+                        },
+                        {
+                            '$unwind': {'path': '$stock'}
+                        },
+                        {
+                            '$lookup': {'from': 'Item',
+                                        'localField': 'stock.s_i_id',
+                                        'foreignField': 'i_id',
+                                        'as': 'item'}
+                        },
+                        {
+                            '$unwind': {'path': '$item'}
+                        },
+                        {
+                            '$match': {'item.i_data': {'$regex': '^co'}}
+                        },
+                        {
+                            '$group': {'_id': {'s_i_id': '$stock.s_i_id',
+                                               's_w_id': '$stock.s_w_id',
+                                               's_quantity': '$stock.s_quantity'},
+                                       'total_quantity': {'$sum': '$o_orderline.ol_quantity'}}
+                        },
+                        {
+                            '$match': {'$expr': {
+                                '$gt': [{'$multiply': [100, '$_id.s_quantity']}, '$total_quantity']
+                            }}
+                        },
+                        {
+                            '$project': {
+                                'supplier_no': {'$mod': [{'$multiply': ['$_id.s_w_id', '$_id.s_i_id']}, 10000]},
+                            }
+                        },
+                        {
+                            '$lookup': {'from': 'Supplier',
+                                        'localField': 'supplier_no',
+                                        'foreignField': 'su_suppkey',
+                                        'as': 'supplier'}
+                        },
+                        {
+                            '$unwind': {'path': '$supplier'}
+                        },
+                        {
+                            '$lookup': {'from': 'Nation',
+                                        'localField': 'su_nationkey',
+                                        'foreignField': 'n_nationkey',
+                                        'as': 'nation'}
+                        },
+                        {
+                            '$unwind': {'path': '$nation'}
+                        },
+                        {
+                            '$match': {'n_name': 'Germany'}
+                        },
+                        {
+                            '$project': {
+                                'su_name': '$supplier.su_name',
+                                'su_address': '$supplier.su_address'
+                            }
+                        },
+                        {
+                            '$sort': {'su_name': 1}
+                        }
+                    ],
+                    'timeout': timeout * 1000
+                })
+
+        return _Query20Runnable(query_suite=self)
 
 
 class MongoDBBenchmarkRunnable(AbstractBenchmarkRunnable):
