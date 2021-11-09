@@ -243,8 +243,8 @@ class AsterixDBBenchmarkQuerySuite(AbstractBenchmarkQuerySuite):
                     FROM        Supplier SU, Revenue R
                     WHERE       SU.su_suppkey = R.supplier_no AND 
                                 R.total_revenue = ( 
-                                FROM        Revenue    
-                                SELECT      VALUE MAX(total_revenue) 
+                        FROM    Revenue    
+                        SELECT  VALUE MAX(total_revenue) 
                     )[0]
                     SELECT      SU.su_suppkey, SU.su_name, SU.su_address, SU.su_phone, R.total_revenue
                     ORDER BY    SU.su_suppkey;
@@ -263,12 +263,11 @@ class AsterixDBBenchmarkQuerySuite(AbstractBenchmarkQuerySuite):
                     {self.query_suite.query_prefix}
                     FROM        Supplier SU, Nation N
                     WHERE       SU.su_suppkey IN (
-                                FROM        Stock S, Orders O, O.o_orderline OL
+                                FROM        Orders O, O.o_orderline OL, Stock S
                                 WHERE       S.s_i_id IN (
-                                            SELECT  VALUE I.i_id
-                                            FROM    Item I
-                                            WHERE   I.i_data LIKE 'co%'
-                                            ) AND 
+                                    FROM    Item I
+                                    WHERE   I.i_data LIKE 'co%'
+                                    SELECT  VALUE I.i_id ) AND 
                                             OL.ol_i_id = S.s_i_id AND 
                                             OL.ol_delivery_d BETWEEN '{v0}' AND '{v1}'
                                 GROUP BY    S.s_i_id, S.s_w_id, S.s_quantity
