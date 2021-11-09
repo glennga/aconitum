@@ -30,14 +30,8 @@ class MongoDBBenchmarkQuerySuite(AbstractBenchmarkQuerySuite):
         elif count is not None and aggregate is not None:
             raise ValueError("Both predicate and aggregate cannot be specified at the same time.")
 
-        # Attempt to get a plan before executing the query, in case we time out.
-        plan = []
-
         try:
             if count is not None:
-                plan = self.database.command('explain', {
-                    'count': name, 'query': count
-                }, verbosity='queryPlanner')['queryPlanner']['winningPlan']
                 t_before = timeit.default_timer()
                 query_results = [{
                     'order_count': collection.count_documents(count, maxTimeMS=timeout)
@@ -47,9 +41,6 @@ class MongoDBBenchmarkQuerySuite(AbstractBenchmarkQuerySuite):
                 query = count
 
             else:  # aggregate is not None
-                plan = self.database.command('explain', {
-                    'aggregate': name, 'pipeline': aggregate, 'cursor': {}
-                }, verbosity='queryPlanner')['stages']
                 t_before = timeit.default_timer()
                 query_results = [
                     self._format_strict(r) for r in
@@ -69,8 +60,7 @@ class MongoDBBenchmarkQuerySuite(AbstractBenchmarkQuerySuite):
             status = 'timeout'
             query = count if count is not None else aggregate
 
-        return {'queryResults': query_results, 'clientTime': client_time, 'status': status,
-                'query': query, 'plan': plan}
+        return {'queryResults': query_results, 'clientTime': client_time, 'status': status, 'query': query}
 
     def query_a_factory(self) -> AbstractBenchmarkQueryRunnable:
         class _QueryARunnable(AbstractBenchmarkQueryRunnable):
