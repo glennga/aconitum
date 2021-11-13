@@ -96,7 +96,7 @@ class MongoDBBenchmarkQuerySuite(AbstractBenchmarkQuerySuite):
     def query_b_factory(self) -> AbstractBenchmarkQueryRunnable:
         class _QueryBRunnable(AbstractBenchmarkQueryRunnable):
             def __init__(self, query_suite):
-                super(_QueryBRunnable, self).__init__('A', query_suite.generate_dates)
+                super(_QueryBRunnable, self).__init__('B', query_suite.generate_dates)
                 self.query_suite = query_suite
 
             def invoke(self, v0, v1, timeout) -> dict:
