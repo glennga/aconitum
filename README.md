@@ -5,11 +5,11 @@ This repository contains scripts to test various TPC-CH queries across AsterixDB
 All experiments have been executed on AWS EC2 instances. Each node was of type `c5.xlarge` (4 CPUs @ 3.4GHz, 8GB of RAM) with 3000 IOPS SSDs attached. Each node was running Ubuntu Server 20.04 LTS. We record the client response time here, so each experiment executed local to each database server (to minimize client-server communication latencies). 
 
 ### TPC CH(2)
-A modified TPC-CH was utilized here, one that a) more naturally represents orderlines within orders as nested documents, and b) has orderline dates that are uniformly distributed across 7 years. The parameters used for TPC-CH generator were `scaleFactor=1` and `numWarehouses=500`.
+A modified TPC-CH was utilized here, one that a) more naturally represents orderlines within orders as nested documents, and b) has orderline dates that are uniformly distributed across 7 years. The scale used for the TPC-CH generator was `numWarehouses=500`.
 
 ### All Systems
 
-1. Install `python 3.8`, and `python3-pip`.
+1. Install `python3.8`, and `python3-pip`.
 2. Clone this repository onto the server node. Ensure you have the correct requirements.
 
 ```bash
@@ -126,12 +126,12 @@ ON      Orders (
 python3 aconitum/_asterixdb.py
 ```
 
-6. Analyze the results! The results will be stored in the `out` folder under `results.json` as single line JSON documents.
+6. Analyze the results! The results will be stored in the `out` folder under `results.json` as JSONL documents.
 
 ### Couchbase
 
-1. Ensure that Couchbase 7.0 is installed and configured on the node to run the experiments on. Docs on the install can be found [here](https://docs.couchbase.com/server/7.0/install/ubuntu-debian-install.html). Use the deb package instructions to get the latest and greatest. The memory for the Data service is half of the system memory (4096 MB). The only other service that is made available is the Index service (2048 MB). The `Max Parallelism` parameter should be set to the number of cores of your system (in our case, 4).
-2. Create the bucket to hold all of your data. This should utilize the entire cluster's memory-data quota (4096 MB in this case). Change the bucket's ejection-method policy from _Value-only_ to _Full_.
+1. Ensure that Couchbase 7.0 is installed and configured on the node to run the experiments on. Docs on the install can be found [here](https://docs.couchbase.com/server/7.0/install/ubuntu-debian-install.html). Use the deb package instructions to get the latest and greatest. The memory for the Data service should be about 1GB (1024 MB). The only other service that is made available is the Index service, and this should be allocated the remainder of the possible memory (3GB, or 3072 MB). The `Max Parallelism` parameter should be set to the number of cores of your system (in our case, 4). Note that if the `CREATE INDEX` times are longer than desired, increase the OS swap size.
+2. Create the bucket to hold all of your data. This should utilize the entire cluster's memory-data quota (1024 MB in this case). Change the bucket's ejection-method policy from _Value-only_ to _Full_.
 3. Create the collections. The default scope of the bucket houses each collection.
 
 ```sql
@@ -156,9 +156,23 @@ for c in customer nation orders stock item region supplier; do
 done
 ```
 
-5. Build the indexes associated with each collection.
+5. Create an external UDF to convert strings to codepoints.
+
+```bash
+curl -v -X POST \
+  http://localhost:8093/evaluator/v1/libraries/codepoint-js \
+  -u admin:password \
+  -H 'content-type: application/json' \
+  -d 'function stringToCodepoint (inputString) { return inputString.codePointAt(0); }'
+```
+
+
+6. Load the external function, then build the indexes associated with each collection.
 
 ```sql
+CREATE    FUNCTION stringToCodepoint(inputString)
+LANGUAGE  JAVASCRIPT AS "stringToCodepoint" AT "codepoint-js";
+
 CREATE  INDEX customerPrimaryKeyIdx 
 ON      aconitum._default.Customer ( c_w_id, c_d_id, c_id );
 CREATE  INDEX nationPrimaryKeyIdx 
@@ -188,13 +202,24 @@ ON      aconitum._default.Orders (
   IN        o_orderline 
   END
 );
+
+CREATE PRIMARY INDEX customersPrimaryIdx
+ON      aconitum._default.Customer;
+CREATE PRIMARY INDEX nationPrimaryIdx
+ON      aconitum._default.Nation;
 CREATE  PRIMARY INDEX ordersPrimaryIdx
 ON      aconitum._default.Orders;
+CREATE  PRIMARY INDEX stockPrimaryIdx
+ON      aconitum._default.Stock;
 CREATE  PRIMARY INDEX itemPrimaryIdx 
 ON      aconitum._default.Item;
+CREATE  PRIMARY INDEX regionPrimaryIdx
+ON      aconitum._default.Region;
+CREATE  PRIMARY INDEX supplierPrimaryIdx
+ON      aconitum._default.Supplier;
 ```
 
-6. Execute the benchmark query suite for Couchbase.
+7. Execute the benchmark query suite for Couchbase.
 
 ```bash
 python3 aconitum/_couchbase.py

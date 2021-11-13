@@ -91,10 +91,10 @@ class CouchbaseBenchmarkQuerySuite(AbstractBenchmarkQuerySuite):
 
             def invoke(self, v0, v1, timeout) -> dict:
                 return self.query_suite.execute_n1ql(f"""
-                    FROM       {self.query_suite.keyspace_prefix}.Orders O
-                    UNNEST     O.o_orderline OL
-                    JOIN       {self.query_suite.keyspace_prefix}.Item I
-                    ON         I.i_id = OL.ol_i_id
+                    FROM       {self.query_suite.keyspace_prefix}.Item I
+                    JOIN       {self.query_suite.keyspace_prefix}.Orders O
+                    ON         ANY OL IN O.o_orderline 
+                               SATISFIES OL.ol_i_id = I.i_id END
                     WHERE      I.i_id BETWEEN {v0} AND {v1}
                     SELECT     COUNT(*) AS count_order_item;
                 """, timeout=timeout)
@@ -139,8 +139,43 @@ class CouchbaseBenchmarkQuerySuite(AbstractBenchmarkQuerySuite):
         return _Query6Runnable(query_suite=self)
 
     def query_7_factory(self) -> AbstractBenchmarkQueryRunnable:
-        self.logger.info('Query 7 is not implemented. Generating no-op runnable.')
-        return NoOpBenchmarkQueryRunnable('7')
+        class _Query7Runnable(AbstractBenchmarkQueryRunnable):
+            def __init__(self, query_suite):
+                super(_Query7Runnable, self).__init__('7', query_suite.generate_dates)
+                self.query_suite = query_suite
+
+            def invoke(self, v0, v1, timeout) -> dict:
+                return self.query_suite.execute_n1ql(f"""
+                    FROM        {self.query_suite.keyspace_prefix}.Supplier SU
+                    JOIN        {self.query_suite.keyspace_prefix}.Stock S
+                    ON          ((S.s_w_id * S.s_i_id) % 10000) = SU.su_suppkey
+                    JOIN        (
+                        FROM    {self.query_suite.keyspace_prefix}.Orders O
+                        UNNEST  O.o_orderline OL
+                        WHERE   OL.ol_delivery_d BETWEEN '{v0}' AND '{v1}'
+                        SELECT  OL.ol_supply_w_id, OL.ol_i_id, O.o_entry_d, OL.ol_amount, O.o_c_id, O.o_w_id, O.o_d_id
+                    ) AS OLO
+                    ON          OLO.ol_supply_w_id = S.s_w_id AND 
+                                OLO.ol_i_id = S.s_i_id
+                    JOIN        {self.query_suite.keyspace_prefix}.Customer C
+                    ON          C.c_id = OLO.o_c_id AND
+                                C.c_w_id = OLO.o_w_id AND 
+                                C.c_d_id = OLO.o_d_id
+                    JOIN        {self.query_suite.keyspace_prefix}.Nation N1
+                    ON          SU.su_nationkey = N1.n_nationkey
+                    JOIN        {self.query_suite.keyspace_prefix}.Nation N2
+                    ON          (stringToCodepoint(SUBSTR(C.c_state, 1, 1)))[0] = N2.n_nationkey
+                    WHERE       ( ( N1.n_name = 'Germany' AND N2.n_name = 'Cambodia' ) OR
+                                  ( N1.n_name = 'Cambodia' AND N2.n_name = 'Germany' ) )
+                    GROUP BY    SU.su_nationkey, (stringToCodepoint(SUBSTR(C.c_state, 1, 1)))[0], 
+                                SUBSTR(OLO.o_entry_d, 0, 4)
+                    SELECT      SU.su_nationkey AS supp_nation, 
+                                (stringToCodepoint(SUBSTR(C.c_state, 1, 1)))[0] AS cust_nation,
+                                SUBSTR(OLO.o_entry_d, 0, 4) AS l_year, SUM(OLO.ol_amount) AS revenue
+                    ORDER BY    SU.su_nationkey, cust_nation, l_year;
+                """, timeout=timeout)
+
+        return _Query7Runnable(query_suite=self)
 
     def query_12_factory(self) -> AbstractBenchmarkQueryRunnable:
         class _Query12Runnable(AbstractBenchmarkQueryRunnable):
@@ -216,8 +251,43 @@ class CouchbaseBenchmarkQuerySuite(AbstractBenchmarkQuerySuite):
         return _Query15Runnable(query_suite=self)
 
     def query_20_factory(self) -> AbstractBenchmarkQueryRunnable:
-        self.logger.info('Query 20 is not implemented. Generating no-op runnable.')
-        return NoOpBenchmarkQueryRunnable('20')
+        class _Query20Runnable(AbstractBenchmarkQueryRunnable):
+            def __init__(self, query_suite):
+                super(_Query20Runnable, self).__init__('20', query_suite.generate_dates)
+                self.query_suite = query_suite
+
+            def invoke(self, v0, v1, timeout) -> dict:
+                # Note: we cannot switch Stock and Orders here. This would require another index on Stock.
+                return self.query_suite.execute_n1ql(f"""
+                    FROM          {self.query_suite.keyspace_prefix}.Supplier SU
+                    JOIN          {self.query_suite.keyspace_prefix}.Nation N
+                    ON            SU.su_nationkey = N.n_nationkey
+                    JOIN          (
+                        FROM      {self.query_suite.keyspace_prefix}.Stock S
+                        JOIN      (
+                            FROM    {self.query_suite.keyspace_prefix}.Orders O
+                            UNNEST  O.o_orderline OL
+                            WHERE   OL.ol_delivery_d BETWEEN '{v0}' AND '{v1}'
+                            SELECT  OL.ol_i_id, OL.ol_quantity
+                        ) AS OLO  
+                        ON        OLO.ol_i_id = S.s_i_id
+                        JOIN      (
+                            FROM    {self.query_suite.keyspace_prefix}.Item I
+                            WHERE   I.i_data LIKE 'co%'
+                            SELECT  I.i_id
+                        ) AS II
+                        ON        II.i_id = S.s_i_id
+                        GROUP BY  S.s_i_id, S.s_w_id, S.s_quantity
+                        HAVING    (100 * S.s_quantity) > SUM(OLO.ol_quantity)
+                        SELECT    ((S.s_w_id * S.s_i_id) % 10000) AS suppkey
+                    ) AS SOOL
+                    ON            SOOL.suppkey = SU.su_suppkey
+                    WHERE         N.n_name = 'Germany'
+                    SELECT        SU.su_name, SU.su_address
+                    ORDER BY      SU.su_name;
+                  """, timeout=timeout)
+
+        return _Query20Runnable(query_suite=self)
 
 
 class CouchbaseBenchmarkRunnable(AbstractBenchmarkRunnable):
