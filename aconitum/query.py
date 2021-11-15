@@ -26,7 +26,7 @@ class AbstractBenchmarkQuerySuite(abc.ABC):
         """ Generate a random range between the start and end order dates. """
         benchmark_run_date = datetime.datetime.strptime(self.config['runDate'], '%Y-%m-%d %H:%M:%S')
         benchmark_start_date = benchmark_run_date - relativedelta.relativedelta(years=7)
-        benchmark_end_date = benchmark_run_date - relativedelta.relativedelta(days=1) - datetime.timedelta(days=151)
+        benchmark_end_date = benchmark_run_date - relativedelta.relativedelta(days=1)
 
         # Determine the desired delta using the given sigma.
         desired_delta = (sigma / 100.0) * (benchmark_end_date - benchmark_start_date)
