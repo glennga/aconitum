@@ -6,7 +6,7 @@ import timeit
 from couchbase.auth import PasswordAuthenticator
 from couchbase.cluster import Cluster, ClusterOptions
 
-from aconitum.query import AbstractBenchmarkQueryRunnable, AbstractBenchmarkQuerySuite, NoOpBenchmarkQueryRunnable
+from aconitum.query import AbstractBenchmarkQueryRunnable, AbstractBenchmarkQuerySuite
 from aconitum.executor import AbstractBenchmarkRunnable
 
 
@@ -330,6 +330,9 @@ class CouchbaseBenchmarkRunnable(AbstractBenchmarkRunnable):
     def perform_benchmark(self):
         for i in range(self.config['experiment']['repeat']):
             for sigma in self.config['experiment']['sigmaValues']:
+                self.logger.info('Restarting the Couchbase instance.')
+                self.call_subprocess(self.config['restartCommand'])
+
                 for query in CouchbaseBenchmarkQuerySuite(
                     cluster=self.cluster,
                     bucket_name=self.bucket_name,

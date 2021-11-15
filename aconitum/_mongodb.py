@@ -7,7 +7,7 @@ import urllib.parse
 import bson.json_util
 import pymongo.errors
 
-from aconitum.query import AbstractBenchmarkQueryRunnable, AbstractBenchmarkQuerySuite, NoOpBenchmarkQueryRunnable
+from aconitum.query import AbstractBenchmarkQueryRunnable, AbstractBenchmarkQuerySuite
 from aconitum.executor import AbstractBenchmarkRunnable
 
 
@@ -675,6 +675,9 @@ class MongoDBBenchmarkRunnable(AbstractBenchmarkRunnable):
     def perform_benchmark(self):
         for i in range(self.config['experiment']['repeat']):
             for sigma in self.config['experiment']['sigmaValues']:
+                # self.logger.info('Restarting the MongoDB instance.')
+                # self.call_subprocess(self.config['restartCommand'])
+
                 for query in MongoDBBenchmarkQuerySuite(
                     database=self.database,
                     logger=self.logger,

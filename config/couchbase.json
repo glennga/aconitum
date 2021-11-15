@@ -2,9 +2,10 @@
   "username": "admin",
   "password": "password",
   "cluster": {
-    "ramsize": 3899,
-    "indexRamsize": 512,
+    "ramsize": 1024,
+    "indexRamsize": 3072,
     "address": "localhost",
     "bucket": "aconitum"
-  }
+  },
+  "restartCommand": "/home/ubuntu/restart-couchbase.sh"
 }

@@ -312,14 +312,17 @@ class AsterixDBBenchmarkRunnable(AbstractBenchmarkRunnable):
         super().__init__(**self._collect_config(**kwargs))
 
         # Determine our API entry-point.
-        self.nc_uri = self.config['benchmark']['clusterController']['address'] + ':' + \
-                      str(self.config['benchmark']['clusterController']['port'])
+        self.nc_uri = self.config['clusterController']['address'] + ':' + \
+                      str(self.config['clusterController']['port'])
         self.nc_uri = 'http://' + self.nc_uri + '/query/service'
         self.exclude_set = set()
 
     def perform_benchmark(self):
         for i in range(self.config['experiment']['repeat']):
             for sigma in self.config['experiment']['sigmaValues']:
+                # self.logger.info('Restarting the AsterixDB instance.')
+                # self.call_subprocess(self.config['restartCommand'])
+
                 for query in AsterixDBBenchmarkQuerySuite(
                     query_prefix=self.config['queryPrefix'],
                     nc_uri=self.nc_uri,

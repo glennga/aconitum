@@ -1,12 +1,11 @@
 {
-  "benchmark": {
-    "clusterController": {
-      "address": "localhost",
-      "port": 19002
-    },
-    "allNodesInCluster": [
-      "localhost"
-    ]
+  "clusterController": {
+    "address": "localhost",
+    "port": 19002
   },
-  "queryPrefix": "SET `compiler.arrayindex` \"true\";\nUSE TPC_CH;"
+  "allNodesInCluster": [
+    "localhost"
+  ],
+  "queryPrefix": "SET `compiler.arrayindex` \"true\"; USE TPC_CH;",
+  "restartCommand": "/home/ubuntu/asterixdb/restart-asterix.sh"
 }
