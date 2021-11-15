@@ -225,7 +225,7 @@ ON      aconitum._default.Supplier;
 python3 aconitum/_couchbase.py
 ```
 
-7. Analyze the results! The results will be stored in the `out` folder under `results.json` as single line JSON documents.
+8. Analyze the results! The results will be stored in the `out` folder under `results.json` as JSONL documents.
 
 
 ### MongoDB
