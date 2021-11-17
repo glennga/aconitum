@@ -6,6 +6,7 @@
   "allNodesInCluster": [
     "localhost"
   ],
+  "joinHint": "/* +indexnl */",
   "queryPrefix": "SET `compiler.arrayindex` \"true\"; USE TPC_CH;",
   "restartCommand": "/home/ubuntu/asterixdb/restart-asterix.sh"
 }
