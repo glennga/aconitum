@@ -323,9 +323,6 @@ class AsterixDBBenchmarkRunnable(AbstractBenchmarkRunnable):
     def perform_benchmark(self):
         for i in range(self.config['experiment']['repeat']):
             for sigma in self.config['experiment']['sigmaValues']:
-                # self.logger.info('Restarting the AsterixDB instance.')
-                # self.call_subprocess(self.config['restartCommand'])
-
                 for query in AsterixDBBenchmarkQuerySuite(
                     query_prefix=self.config['queryPrefix'],
                     join_hint=self.config['joinHint'],
@@ -347,8 +344,12 @@ class AsterixDBBenchmarkRunnable(AbstractBenchmarkRunnable):
 
                     # If this query has timed out, add the query + parameter to the exclude set.
                     if results['status'] == 'timeout':
-                        self.logger.warning('Query has timed out. No longer running working sigma + query.')
-                        self.exclude_set.add((sigma, str(query),))
+                        self.logger.warning('Query has timed out. No longer running (>= sigma) + query.')
+                        for excluded_sigma in self.config['experiment']['sigmaValues']:
+                            if excluded_sigma >= sigma:
+                                self.exclude_set.add((excluded_sigma, str(query),))
+                        self.logger.info('Restarting the AsterixDB instance.')
+                        self.call_subprocess(self.config['restartCommand'])
 
 
 if __name__ == '__main__':

@@ -12,9 +12,9 @@ from aconitum.executor import AbstractBenchmarkRunnable
 
 
 class MongoDBBenchmarkQuerySuite(AbstractBenchmarkQuerySuite):
-    def __init__(self, database, logger, **kwargs):
+    def __init__(self, database_factory, logger, **kwargs):
         super().__init__(logger=logger, **kwargs)
-        self.database = database
+        self.database_factory = database_factory
         self.logger = logger
 
     @staticmethod
@@ -22,7 +22,7 @@ class MongoDBBenchmarkQuerySuite(AbstractBenchmarkQuerySuite):
         return json.loads(bson.json_util.dumps(result))
 
     def execute_select(self, name, count=None, aggregate=None, timeout=None):
-        collection = self.database[name]
+        collection = self.database_factory()[name]
 
         if count is None and aggregate is None:
             raise ValueError("Either predicate or aggregate must be specified.")
@@ -668,18 +668,14 @@ class MongoDBBenchmarkRunnable(AbstractBenchmarkRunnable):
                             f'{urllib.parse.quote_plus(self.config["password"])}@' \
                             f'{self.config["database"]["address"]}' + \
                             f':{self.config["database"]["port"]}'
-        self.client = pymongo.MongoClient(self.database_uri)
-        self.database = self.client[self.config['database']['name']]
+        self.database_factory = lambda: pymongo.MongoClient(self.database_uri)[self.config['database']['name']]
         self.exclude_set = set()
 
     def perform_benchmark(self):
         for i in range(self.config['experiment']['repeat']):
             for sigma in self.config['experiment']['sigmaValues']:
-                # self.logger.info('Restarting the MongoDB instance.')
-                # self.call_subprocess(self.config['restartCommand'])
-
                 for query in MongoDBBenchmarkQuerySuite(
-                    database=self.database,
+                    database_factory=self.database_factory,
                     logger=self.logger,
                     **self.config['tpcCH']
                 ):
@@ -697,8 +693,12 @@ class MongoDBBenchmarkRunnable(AbstractBenchmarkRunnable):
 
                     # If this query has timed out, add the query + parameter to the exclude set.
                     if results['status'] == 'timeout':
-                        self.logger.warning('Query has timed out. No longer running working sigma + query.')
-                        self.exclude_set.add((sigma, str(query),))
+                        self.logger.warning('Query has timed out. No longer running (>= sigma) + query.')
+                        for excluded_sigma in self.config['experiment']['sigmaValues']:
+                            if excluded_sigma >= sigma:
+                                self.exclude_set.add((excluded_sigma, str(query),))
+                        self.logger.info('Restarting the MongoDB instance.')
+                        self.call_subprocess(self.config['restartCommand'])
 
 
 if __name__ == '__main__':
