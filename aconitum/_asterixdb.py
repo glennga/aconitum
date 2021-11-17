@@ -13,6 +13,7 @@ class AsterixDBBenchmarkQuerySuite(AbstractBenchmarkQuerySuite):
     def __init__(self, nc_uri, logger, **kwargs):
         super().__init__(logger=logger, **kwargs)
         self.query_prefix = kwargs['query_prefix']
+        self.join_hint = kwargs['join_hint']
         self.nc_uri = nc_uri
         self.logger = logger
 
@@ -107,7 +108,7 @@ class AsterixDBBenchmarkQuerySuite(AbstractBenchmarkQuerySuite):
                     {self.query_suite.query_prefix}
                     FROM       Item I, Orders O, O.o_orderline OL
                     WHERE      I.i_id BETWEEN {v0} AND {v1} AND 
-                               TO_BIGINT(I.i_id) /* +indexnl */ = OL.ol_i_id
+                               TO_BIGINT(I.i_id) {self.query_suite.join_hint} = OL.ol_i_id
                     SELECT     COUNT(*) AS count_order_item;
                 """, timeout=timeout)
 
@@ -158,24 +159,26 @@ class AsterixDBBenchmarkQuerySuite(AbstractBenchmarkQuerySuite):
 
             def invoke(self, v0, v1, timeout) -> dict:
                 return self.query_suite.execute_sqlpp(f"""
-                    {self.query_suite.query_prefix}
-                    FROM        Supplier SU, Stock S, Orders O, O.o_orderline OL, Customer C, Nation N1, Nation N2
-                    WHERE       OL.ol_supply_w_id = S.s_w_id AND
-                                OL.ol_i_id = S.s_i_id AND
-                                ((S.s_w_id * S.s_i_id) % 10000) = SU.su_suppkey AND
-                                C.c_id = O.o_c_id AND
-                                C.c_w_id = O.o_w_id AND
-                                C.c_d_id = O.o_d_id AND
-                                SU.su_nationkey = N1.n_nationkey AND
-                                STRING_TO_CODEPOINT(SUBSTR(C.c_state, 1, 1))[0]  = N2.n_nationkey AND
+                    {self.query_suite.query_prefix}        
+                    FROM        Orders O, O.o_orderline OL, Stock S, Customer C, Supplier SU, Nation N1, Nation N2
+                    LET         s_suppkey = ((S.s_w_id * S.s_i_id) % 10000), 
+                                c_nationkey = STRING_TO_CODEPOINT(SUBSTR(C.c_state, 1, 1))[0]
+                    WHERE       S.s_w_id {self.query_suite.join_hint} = TO_BIGINT(OL.ol_supply_w_id) AND
+                                S.s_i_id {self.query_suite.join_hint} = TO_BIGINT(OL.ol_i_id) AND
+                                C.c_id {self.query_suite.join_hint} = TO_BIGINT(O.o_c_id) AND
+                                C.c_w_id {self.query_suite.join_hint} = TO_BIGINT(O.o_w_id) AND
+                                C.c_d_id {self.query_suite.join_hint} = TO_BIGINT(O.o_d_id) AND
+                                SU.su_suppkey {self.query_suite.join_hint} = TO_BIGINT(s_suppkey) AND
+                                N1.n_nationkey {self.query_suite.join_hint} = TO_BIGINT(SU.su_nationkey) AND
+                                N2.n_nationkey {self.query_suite.join_hint} = TO_BIGINT(c_nationkey) AND
                                 ( ( N1.n_name = 'Germany' AND N2.n_name = 'Cambodia' ) OR
                                   ( N1.n_name = 'Cambodia' AND N2.n_name = 'Germany' ) ) AND
                                 OL.ol_delivery_d BETWEEN '{v0}' AND '{v1}'
-                    GROUP BY    SU.su_nationkey, STRING_TO_CODEPOINT(SUBSTR(C.c_state, 1, 1))[0], 
-                                SUBSTR(O.o_entry_d, 0, 4)
+                    GROUP BY    SU.su_nationkey, c_nationkey, SUBSTR(O.o_entry_d, 0, 4)
                     SELECT      SU.su_nationkey AS supp_nation, 
-                                STRING_TO_CODEPOINT(SUBSTR(C.c_state, 1, 1))[0] AS cust_nation,
-                                SUBSTR(O.o_entry_d, 0, 4) AS l_year, SUM(OL.ol_amount) AS revenue
+                                c_nationkey AS cust_nation,
+                                SUBSTR(O.o_entry_d, 0, 4) AS l_year, 
+                                SUM(OL.ol_amount) AS revenue
                     ORDER BY    SU.su_nationkey, cust_nation, l_year;
                 """, timeout=timeout)
 
@@ -213,9 +216,9 @@ class AsterixDBBenchmarkQuerySuite(AbstractBenchmarkQuerySuite):
             def invoke(self, v0, v1, timeout) -> dict:
                 return self.query_suite.execute_sqlpp(f"""
                     {self.query_suite.query_prefix}
-                    FROM    Item I, Orders O, O.o_orderline OL
-                    WHERE   OL.ol_i_id = I.i_id AND 
-                            OL.ol_delivery_d BETWEEN '{v0}' AND '{v1}'
+                    FROM    Orders O, O.o_orderline OL, Item I
+                    WHERE   OL.ol_delivery_d BETWEEN '{v0}' AND '{v1}' AND 
+                            I.i_id {self.query_suite.join_hint} = TO_BIGINT(OL.ol_i_id) 
                     SELECT  100.00 * SUM(CASE WHEN I.i_data LIKE 'pr%' THEN OL.ol_amount ELSE 0 END) / 
                                 (1 + SUM(OL.ol_amount)) AS promo_revenue;
                 """, timeout=timeout)
@@ -233,19 +236,20 @@ class AsterixDBBenchmarkQuerySuite(AbstractBenchmarkQuerySuite):
                     {self.query_suite.query_prefix}
                     WITH        Revenue AS (
                                 FROM        Orders O, O.o_orderline OL, Stock S
-                                WHERE       OL.ol_i_id = S.s_i_id AND 
-                                            OL.ol_supply_w_id = S.s_w_id AND
+                                LET         supplier_no = ((S.s_w_id * S.s_i_id) % 10000)
+                                WHERE       S.s_i_id {self.query_suite.join_hint} = TO_BIGINT(OL.ol_i_id) AND 
+                                            S.s_w_id {self.query_suite.join_hint} = TO_BIGINT(OL.ol_supply_w_id) AND
                                             OL.ol_delivery_d BETWEEN '{v0}' AND '{v1}'
-                                GROUP BY    ((S.s_w_id * S.s_i_id) % 10000)
-                                SELECT      ((S.s_w_id * S.s_i_id) % 10000) AS supplier_no, 
+                                GROUP BY    supplier_no
+                                SELECT      supplier_no,
                                             SUM(OL.ol_amount) AS total_revenue
                     )
-                    FROM        Supplier SU, Revenue R
-                    WHERE       SU.su_suppkey = R.supplier_no AND 
+                    FROM        Revenue R, Supplier SU
+                    WHERE       SU.su_suppkey {self.query_suite.join_hint} = TO_BIGINT(R.supplier_no) AND 
                                 R.total_revenue = ( 
-                        FROM    Revenue    
-                        SELECT  VALUE MAX(total_revenue) 
-                    )[0]
+                                    FROM    Revenue    
+                                    SELECT  VALUE MAX(total_revenue) 
+                                )[0]
                     SELECT      SU.su_suppkey, SU.su_name, SU.su_address, SU.su_phone, R.total_revenue
                     ORDER BY    SU.su_suppkey;
                 """, timeout=timeout)
@@ -261,20 +265,19 @@ class AsterixDBBenchmarkQuerySuite(AbstractBenchmarkQuerySuite):
             def invoke(self, v0, v1, timeout) -> dict:
                 return self.query_suite.execute_sqlpp(f"""
                     {self.query_suite.query_prefix}
-                    FROM        Supplier SU, Nation N
-                    WHERE       SU.su_suppkey IN (
-                                FROM        Orders O, O.o_orderline OL, Stock S
-                                WHERE       S.s_i_id IN (
-                                    FROM    Item I
-                                    WHERE   I.i_data LIKE 'co%'
-                                    SELECT  VALUE I.i_id ) AND 
-                                            OL.ol_i_id = S.s_i_id AND 
+                    WITH        SupplierKeys AS (
+                                FROM        Orders O, O.o_orderline OL, Stock S, Item I
+                                WHERE       OL.ol_i_id = S.s_i_id AND
+                                            I.i_id {self.query_suite.join_hint} = TO_BIGINT(S.s_i_id) AND
+                                            I.i_data LIKE 'co%' AND 
                                             OL.ol_delivery_d BETWEEN '{v0}' AND '{v1}'
                                 GROUP BY    S.s_i_id, S.s_w_id, S.s_quantity
                                 HAVING      (100 * S.s_quantity) > SUM(OL.ol_quantity)
                                 SELECT      VALUE ((S.s_w_id * S.s_i_id) % 10000)
-                                ) AND 
-                                SU.su_nationkey = N.n_nationkey AND 
+                    )
+                    FROM        SupplierKeys SK, Supplier SU, Nation N
+                    WHERE       SU.su_suppkey {self.query_suite.join_hint} = TO_BIGINT(SK) AND
+                                N.n_nationkey {self.query_suite.join_hint} = TO_BIGINT(SU.su_nationkey) AND 
                                 N.n_name = 'Germany'
                     SELECT      SU.su_name, SU.su_address
                     ORDER BY    SU.su_name;
@@ -325,6 +328,7 @@ class AsterixDBBenchmarkRunnable(AbstractBenchmarkRunnable):
 
                 for query in AsterixDBBenchmarkQuerySuite(
                     query_prefix=self.config['queryPrefix'],
+                    join_hint=self.config['joinHint'],
                     nc_uri=self.nc_uri,
                     logger=self.logger,
                     **self.config['tpcCH']
