@@ -271,20 +271,6 @@ class MongoDBBenchmarkQuerySuite(AbstractBenchmarkQuerySuite):
                             }}
                         },
                         {
-                            '$addFields': {
-                                'supplier_no': {'$mod': [{'$multiply': ['$stock.s_w_id', '$stock.s_i_id']}, 10000]}
-                            }
-                        },
-                        {
-                            '$lookup': {'from': 'Supplier',
-                                        'localField': 'supplier_no',
-                                        'foreignField': 'su_suppkey',
-                                        'as': 'supplier'}
-                        },
-                        {
-                            '$unwind': {'path': '$supplier'}
-                        },
-                        {
                             '$lookup': {'from': 'Customer',
                                         'localField': 'o_c_id',
                                         'foreignField': 'c_id',
@@ -298,6 +284,20 @@ class MongoDBBenchmarkQuerySuite(AbstractBenchmarkQuerySuite):
                                 '$and': [{'$eq': ['$customer.c_w_id', '$o_w_id']},
                                          {'$eq': ['$customer.c_d_id', '$o_d_id']}]
                             }}
+                        },
+                        {
+                            '$addFields': {
+                                'supplier_no': {'$mod': [{'$multiply': ['$stock.s_w_id', '$stock.s_i_id']}, 10000]}
+                            }
+                        },
+                        {
+                            '$lookup': {'from': 'Supplier',
+                                        'localField': 'supplier_no',
+                                        'foreignField': 'su_suppkey',
+                                        'as': 'supplier'}
+                        },
+                        {
+                            '$unwind': {'path': '$supplier'}
                         },
                         {
                             '$lookup': {'from': 'Nation',
