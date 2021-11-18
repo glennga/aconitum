@@ -342,9 +342,9 @@ class AsterixDBBenchmarkRunnable(AbstractBenchmarkRunnable):
                     results['runNumber'] = i
                     self.log_results(results)
 
-                    # If this query has timed out, add the query + parameter to the exclude set.
-                    if results['status'] == 'timeout':
-                        self.logger.warning('Query has timed out. No longer running (>= sigma) + query.')
+                    # If this query was not successful, add the query + parameter to the exclude set.
+                    if results['status'] != 'success':
+                        self.logger.warning('Query was not successful. No longer running (>= sigma) + query.')
                         for excluded_sigma in self.config['experiment']['sigmaValues']:
                             if excluded_sigma >= sigma:
                                 self.exclude_set.add((excluded_sigma, str(query),))
