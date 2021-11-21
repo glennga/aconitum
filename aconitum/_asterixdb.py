@@ -281,7 +281,7 @@ class AsterixDBBenchmarkQuerySuite(AbstractBenchmarkQuerySuite):
                                 N.n_name = 'Germany'
                     SELECT      SU.su_name, SU.su_address
                     ORDER BY    SU.su_name;
-                """)
+                """, timeout=timeout)
 
         return _Query20Runnable(query_suite=self)
 
