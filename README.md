@@ -130,7 +130,7 @@ python3 aconitum/_asterixdb.py
 
 ### Couchbase
 
-1. Ensure that Couchbase 7.0 is installed and configured on the node to run the experiments on. Docs on the install can be found [here](https://docs.couchbase.com/server/7.0/install/ubuntu-debian-install.html). Use the deb package instructions to get the latest and greatest. The memory for the Data service should be about 1GB (1024 MB). The only other service that is made available is the Index service, and this should be allocated the remainder of the possible memory (3GB, or 3072 MB). The `Max Parallelism` parameter should be set to the number of cores of your system (in our case, 4). Note that if the `CREATE INDEX` times are longer than desired, increase the OS swap size.
+1. Ensure that Couchbase 7.0 is installed and configured on the node to run the experiments on. Docs on the install can be found [here](https://docs.couchbase.com/server/7.0/install/ubuntu-debian-install.html). Use the deb package instructions to get the latest and greatest. The memory for the Data service should be about 1GB (1024 MB). The only other service that is made available is the Index service, and this should be allocated the remainder of the possible memory (3GB, or 3072 MB). The `Max Parallelism` parameter should be set to the number of cores of your system (in our case, 4).
 2. Create the bucket to hold all of your data. This should utilize the entire cluster's memory-data quota (1024 MB in this case). Change the bucket's ejection-method policy from _Value-only_ to _Full_.
 3. Create the collections. The default scope of the bucket houses each collection.
 
@@ -167,7 +167,7 @@ curl -v -X POST \
 ```
 
 
-6. Load the external function, then build the indexes associated with each collection.
+6. Load the external function, then build the indexes associated with each collection. We were unable to load all the indexes (without trouble) without (a) first upgrading the node type, (b) increasing the indexer allocated memory, (c) running the statements below, and (d) downgrading the nodes to the appropriate size. 
 
 ```sql
 CREATE    FUNCTION stringToCodepoint(inputString)
